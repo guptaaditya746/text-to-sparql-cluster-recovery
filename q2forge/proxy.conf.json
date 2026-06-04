@@ -1,0 +1,17 @@
+{
+    "/sparql/*": {
+        "target": "https://idsm.elixir-czech.cz/",
+        "secure": false,
+        "changeOrigin": true
+    },
+    "/chat": {
+        "target": "https://api.deepseek.com",
+        "secure": false,
+        "changeOrigin": true
+    },
+    "/graphdb":{
+        "target": "https://enpkg.commons-lab.org",
+        "secure": false,
+        "changeOrigin": true
+    }
+}

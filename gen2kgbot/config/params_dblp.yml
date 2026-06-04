@@ -1,0 +1,131 @@
+# KG full name (used in prompts)
+kg_full_name: DBLP Computer Science Bibliography Knowledge Graph
+
+# KG short name (used to generate file paths)
+kg_short_name: dblp
+
+# KG textual description (used in prompts)
+kg_description: >
+  The DBLP Knowledge Graph describes the computer science bibliography. It includes
+  scholarly publications, authors and editors, publication venues such as journals
+  and conferences, publication years, identifiers, citations, and relationships
+  between creators and scholarly works.
+
+# SPARQL endpoint serving the KG
+kg_sparql_endpoint_url: "https://sparql.dblp.org/sparql"
+
+# SPARQL endpoint serving the DBLP RDF schema
+ontologies_sparql_endpoint_url: "https://sparql.dblp.org/sparql"
+
+# Prefixes and namespaces to be used in Turtle and SPARQL queries
+prefixes:
+  dblp: "https://dblp.org/rdf/schema#"
+  rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  rdfs: "http://www.w3.org/2000/01/rdf-schema#"
+  xsd: "http://www.w3.org/2001/XMLSchema#"
+  owl: "http://www.w3.org/2002/07/owl#"
+  dct: "http://purl.org/dc/terms/"
+  dc: "http://purl.org/dc/elements/1.1/"
+  foaf: "http://xmlns.com/foaf/0.1/"
+  schema: "https://schema.org/"
+  bibo: "http://purl.org/ontology/bibo/"
+  cito: "http://purl.org/spar/cito/"
+
+# DBLP exposes its schema in the default graph of the public endpoint.
+ontology_named_graphs: []
+
+# Properties used to extract context for QNames in generated SPARQL queries
+properties_qnames_info:
+  - rdfs:label
+  - rdfs:comment
+  - dblp:title
+  - dblp:primaryCreatorName
+  - dblp:creatorName
+  - dblp:primaryStreamTitle
+  - dblp:streamTitle
+  - dblp:yearOfPublication
+  - dblp:doi
+  - dblp:orcid
+  - dblp:affiliation
+
+# Optional list of classes and namespaces to exclude from similar-class retrieval
+excluded_classes_namespaces: []
+
+# Root path for classes context and pre-computed embeddings
+data_directory: "./data"
+
+# Embedding sub-directories
+class_embeddings_subdir: "classes_with_instance_nomic"
+property_embeddings_subdir: "properties_nomic"
+queries_embeddings_subdir: "sparql_queries_nomic"
+
+# Path to a usable temporary directory
+temp_directory: "./tmp"
+
+# Retrieval options
+max_similar_classes: 10
+expand_similar_classes: false
+class_context_format: turtle
+
+# -----------------------------------------------------------
+# LLM configurations
+
+seq2seq_models:
+  llama3_2-1b@local:
+    server_type: ollama
+    id: llama3.2:1b
+    temperature: 0
+    max_retries: 3
+    top_p: 0.95
+
+text_embedding_models:
+  nomic-embed-text_faiss@local:
+    server_type: ollama-embeddings
+    id: nomic-embed-text
+    vector_db: faiss
+
+# -----------------------------------------------------------
+# Scenarios
+
+scenario_1:
+  validate_question: llama3_2-1b@local
+  ask_question: llama3_2-1b@local
+
+scenario_2:
+  validate_question: llama3_2-1b@local
+  generate_query: llama3_2-1b@local
+  interpret_results: llama3_2-1b@local
+
+scenario_3:
+  validate_question: llama3_2-1b@local
+  generate_query: llama3_2-1b@local
+  interpret_results: llama3_2-1b@local
+  text_embedding_model: nomic-embed-text_faiss@local
+
+scenario_4:
+  validate_question: llama3_2-1b@local
+  generate_query: llama3_2-1b@local
+  interpret_results: llama3_2-1b@local
+  text_embedding_model: nomic-embed-text_faiss@local
+
+scenario_5:
+  validate_question: llama3_2-1b@local
+  generate_query: llama3_2-1b@local
+  interpret_results: llama3_2-1b@local
+  text_embedding_model: nomic-embed-text_faiss@local
+
+scenario_6:
+  validate_question: llama3_2-1b@local
+  generate_query: llama3_2-1b@local
+  interpret_results: llama3_2-1b@local
+  text_embedding_model: nomic-embed-text_faiss@local
+
+scenario_7:
+  validate_question: llama3_2-1b@local
+  generate_query: llama3_2-1b@local
+  judge_query: llama3_2-1b@local
+  judge_regenerate_query: llama3_2-1b@local
+  interpret_results: llama3_2-1b@local
+  text_embedding_model: nomic-embed-text_faiss@local
+  judging_grade_threshold_retry: 8
+  judging_grade_threshold_run: 5

@@ -1,0 +1,140 @@
+<div>
+    <div class="page-header">SPARQL Query Refinement</div>
+
+    <div class="form">
+        <mat-form-field class="full-width" matTooltip="The question to answer from the KG" matTooltipPosition="above">
+            <mat-label>Question</mat-label>
+            <textarea rows="1" matInput placeholder="e.g. {{model.question}}" [formControl]="question"></textarea>
+            @if (question.hasError('required')) {
+            <mat-error>The question is <strong>required</strong></mat-error>
+            }
+        </mat-form-field>
+
+        <div #yasgui class="yasgui-container"></div>
+
+
+        <div class="query-buttons-container">
+            <button mat-raised-button (click)="addToDataset()"
+                matTooltip="Add the (question, SPARQL query) pair to the current dataset" matTooltipPosition="above"
+                [disabled]="!currentQuery || currentQuery == '' || !question.value">
+                <mat-icon>playlist_add</mat-icon>
+                Add to Dataset
+            </button>
+            <button mat-raised-button extended (click)="exportDataset()"
+                matTooltip="Open the dataset management dialog to export the dataset" matTooltipPosition="above">
+                <mat-icon>import_export</mat-icon>
+                Export Dataset
+            </button>
+        </div>
+        <mat-form-field class="info-chip-list"
+            matTooltip="Properties used to extract context for the Qnames/FQNames in the SPARQL query"
+            matTooltipPosition="above">
+            <mat-label>Get these proporties</mat-label>
+            <mat-chip-grid #chipGrid aria-label="Enter property">
+                @for (property of properties(); track property) {
+                <mat-chip-row (removed)="remove(property)" [editable]="true" (edited)="edit(property, $event)"
+                    [aria-description]="'press enter to edit ' + property">
+                    {{property}}
+                    <button matChipRemove [attr.aria-label]="'remove ' + property">
+                        <mat-icon>cancel</mat-icon>
+                    </button>
+                </mat-chip-row>
+                }
+                <input placeholder="New property..." [matChipInputFor]="chipGrid"
+                    [matChipInputSeparatorKeyCodes]="separatorKeysCodes" [matChipInputAddOnBlur]="addOnBlur"
+                    (matChipInputTokenEnd)="add($event)" />
+            </mat-chip-grid>
+        </mat-form-field>
+
+        <div class="query-buttons-container">
+            <button mat-raised-button class="warning" (click)="reset()" matTooltip="Reset the fields"
+                matTooltipPosition="above">
+                <mat-icon>restore</mat-icon>
+                Reset
+            </button>
+            <button mat-raised-button (click)="addKnownPrefixes()" [disabled]="!currentQuery"
+                matTooltip="Add known prefixes from the active config" matTooltipPosition="above">
+                <mat-icon>add</mat-icon>
+                Add known Prefixes
+            </button>
+            <mat-slide-toggle [formControl]="displayAllInfo"
+                matTooltip="Where or not to display all the properties when they are empty" matTooltipPosition="above">
+                displayAllInfo
+            </mat-slide-toggle>
+            <button mat-raised-button (click)="getQNamesContext()" [disabled]="!currentQuery || currentQuery == ''"
+                matTooltip="Get the context of the QNames/FQNames from the SPARQL query using the indicated properties"
+                matTooltipPosition="above">
+                <mat-icon>find_in_page</mat-icon>
+                Get QNames context
+            </button>
+        </div>
+
+
+    </div>
+
+    @if (loading) {
+    <div class="loading-message">Loading...</div>
+    }
+    @if (error) {
+    <div class="error-message">{{ error }}</div>
+    }
+
+
+    @if (dataSource && dataSource.length > 0) {
+    <table mat-table [dataSource]="dataSource" class="mat-elevation-z8">
+
+        <!-- URI Column -->
+        <ng-container matColumnDef="uri">
+            <th mat-header-cell *matHeaderCellDef> URI </th>
+            <td mat-cell *matCellDef="let element"> <a target="_blank" href="{{element.uri}}">{{element.uri}}</a> </td>
+        </ng-container>
+
+        <!-- Info Column -->
+        <ng-container matColumnDef="info">
+            <th mat-header-cell *matHeaderCellDef> Info </th>
+            <td mat-cell *matCellDef="let element">
+                @for (item of element.info; track $index) {
+                <div>
+                    <b>{{item[0]}}</b>: {{item[1]}}
+                </div>
+                }
+            </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+    }
+
+    @if (dataSource && dataSource.length > 0) {
+
+    <hr>
+
+    <div class="query-buttons-container">
+        <mat-form-field matTooltip="Model to use in the judging process" matTooltipPosition="above">
+            <mat-label>Model</mat-label>
+            <mat-select [(ngModel)]="model_config_id">
+                @for (model of availableSeq2SeqModels; track model) {
+                <mat-option [value]="model.configName">{{model.configName}}</mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+        <button mat-raised-button (click)="getLLMasJudgeAnswer()" matTooltip="Start the judging of the query"
+            matTooltipPosition="above" [disabled]="!question.value || question.value == ''">
+            <mat-icon>gavel</mat-icon>
+            Judge Question / Query
+        </button>
+    </div>
+    }
+
+    @if (errorLLMAnswer) {
+    <div class="error-message">Error: {{ errorLLMAnswer }}</div>
+    }
+
+    @if (llmAnswer ) {
+    <h2>LLM as a Judge Answer</h2>
+    <div>
+        <markdown [data]="llmAnswer"></markdown>
+    </div>
+    }
+</div>

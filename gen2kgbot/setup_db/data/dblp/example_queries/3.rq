@@ -1,0 +1,12 @@
+# Find coauthors of Michael Ley.
+
+PREFIX dblp: <https://dblp.org/rdf/schema#>
+
+SELECT DISTINCT ?coauthor ?coauthorName WHERE {
+  ?person dblp:primaryCreatorName "Michael Ley" .
+  ?publication dblp:authoredBy ?person ;
+               dblp:authoredBy ?coauthor .
+  ?coauthor dblp:primaryCreatorName ?coauthorName .
+  FILTER(?coauthor != ?person)
+}
+LIMIT 20

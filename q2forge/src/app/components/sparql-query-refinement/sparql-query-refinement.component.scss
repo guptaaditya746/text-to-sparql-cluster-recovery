@@ -1,0 +1,55 @@
+.form {
+  min-width: 150px;
+  width: 100%;
+}
+
+.full-width {
+  width: 100%;
+}
+
+table {
+  width: 100%;
+}
+
+.error-message {
+  color: red;
+  margin: 16px;
+  padding: 16px;
+  border: 1px solid red;
+}
+
+.info-chip-list {
+  width: 100%;
+}
+
+.loading-message {
+  color: rgb(17, 129, 43);
+  margin: 16px;
+  padding: 16px;
+  border: 1px solid rgb(17, 129, 43);
+}
+
+.mat-column-uri {
+  width: 25%
+}
+
+.mat-column-info {
+  width: 75%
+}
+
+.query-buttons-container {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin: 16px;
+  gap: 16px;
+}
+
+.yasgui-container {
+  width: 100%;
+  min-height: 400px;
+}
+
+// .yasqe .yasqe_buttons .yasqe_share {
+//   display: none;
+// }

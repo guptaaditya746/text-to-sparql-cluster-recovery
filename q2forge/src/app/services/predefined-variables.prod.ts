@@ -1,0 +1,20 @@
+const SERVER = "https://gen2kgbot.i3s.unice.fr"
+export const SPARQL_ENDPOINT_URI = `${SERVER}/corese`
+export const API_BASE = `${SERVER}/api/q2forge`
+export const LOGIN_ENDPOINT = `${API_BASE}/token`
+export const SIGN_UP_ENDPOINT = `${API_BASE}/sign-up`
+export const USER_DATA_ENDPOINT = `${API_BASE}/me`
+export const GENERATE_QUESTION_ENDPOINT = `${API_BASE}/generate_questions`
+export const JUDGE_QUERY_ENDPOINT = `${API_BASE}/judge_query`
+export const ANSWER_QUESTION_ENDPOINT = `${API_BASE}/answer_question`
+export const GRAPH_SCHEMA_ENDPOINT = `${API_BASE}/scenarios_graph_schema`
+export const ACTIVE_CONFIG_ENDPOINT = `${API_BASE}/config/active`
+export const CREATE_CONFIG_ENDPOINT = `${API_BASE}/config/create`
+export const ACTIVATE_CONFIG_ENDPOINT = `${API_BASE}/config/activate`
+export const KG_DESCRIPTION_CONFIG_ENDPOINT = `${API_BASE}/config/kg_descriptions`
+export const KG_EMBEDDINGS_CONFIG_ENDPOINT = `${API_BASE}/config/kg_embeddings`
+export const AVAILABLE_CONFIG_ENDPOINT = `${API_BASE}/config/available`
+export const UPDATE_SPARQL_CHATS_ENDPOINT = `${API_BASE}/user/sparql_chats`
+export const DELETE_SPARQL_CHATS_ENDPOINT = `${API_BASE}/user/sparql_chats`
+export const DOCUMENTATION_URI = `${API_BASE}/docs`
+

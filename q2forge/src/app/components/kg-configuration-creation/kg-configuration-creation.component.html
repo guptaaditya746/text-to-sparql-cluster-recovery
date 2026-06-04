@@ -1,0 +1,285 @@
+<div class="container">
+    <div class="page-header">KG Configuration</div>
+
+    <mat-stepper linear #stepper>
+        <mat-step [stepControl]="firstFormGroup" [editable]="isEditable">
+            <form [formGroup]="firstFormGroup">
+                <ng-template matStepLabel>Create a new Configuration</ng-template>
+                <div class="form-group-container">
+                    <mat-form-field matTooltip="KG full name (used in prompts)" matTooltipPosition="above">
+                        <mat-label>KG full name</mat-label>
+                        <input matInput formControlName="kg_full_name" required>
+                        @if (firstFormGroup.get('kg_full_name')?.hasError('required')) {
+                        <mat-error>This field is <strong>required</strong></mat-error>
+                        }
+                    </mat-form-field>
+                    <mat-form-field matTooltip="KG short name (used to generate file paths)" matTooltipPosition="above">
+                        <mat-label>KG short Name</mat-label>
+                        <input matInput formControlName="kg_short_name" required>
+                        @if (firstFormGroup.get('kg_short_name')?.hasError('required')) {
+                        <mat-error>This field is <strong>required</strong></mat-error>
+                        }
+                        @if (firstFormGroup.get('kg_short_name')?.hasError('pattern')) {
+                        <mat-error>Only lowercase letters, numbers and underscores are allowed</mat-error>
+                        }
+                    </mat-form-field>
+                    <mat-form-field matTooltip="KG textual description (used in prompts)" matTooltipPosition="above">
+                        <mat-label>KG description</mat-label>
+                        <textarea matInput formControlName="kg_description" required rows="3"></textarea>
+                        @if (firstFormGroup.get('kg_description')?.hasError('required')) {
+                        <mat-error>This field is <strong>required</strong></mat-error>
+                        }
+                    </mat-form-field>
+                    <mat-form-field matTooltip="SPARQL endpoint serving the KG" matTooltipPosition="above">
+                        <mat-label>KG SPARQL endpoint URL</mat-label>
+                        <input matInput formControlName="kg_sparql_endpoint_url" required>
+                        @if (firstFormGroup.get('kg_sparql_endpoint_url')?.hasError('required')) {
+                        <mat-error>This field is <strong>required</strong></mat-error>
+                        }
+                        @if (firstFormGroup.get('kg_sparql_endpoint_url')?.hasError('pattern')) {
+                        <mat-error>Please enter a valid URI</mat-error>
+                        }
+                    </mat-form-field>
+                    <mat-form-field matTooltip="SPARQL endpoint serving the ontologies, if different from the KG SPARQL endpoint (optional)" matTooltipPosition="above">
+                        <mat-label>Ontologies SPARQL endpoint URL</mat-label>
+                        <input matInput formControlName="ontologies_sparql_endpoint_url">
+                        @if (firstFormGroup.get('ontologies_sparql_endpoint_url')?.hasError('pattern')) {
+                        <mat-error>Please enter a valid URI</mat-error>
+                        }
+                    </mat-form-field>
+                    <mat-form-field matTooltip="Properties used to extract context for the Qnames in a SPARQL query used in the Judging process" matTooltipPosition="above">
+                        <mat-label>Properties QNames info</mat-label>
+                        <mat-chip-grid #chipPropertiesGrid aria-label="Enter property">
+                            @for (property of configuration().properties_qnames_info; track property) {
+                            <mat-chip-row (removed)="removePropertyQName(property)" [editable]="true"
+                                (edited)="editPropertyQName(property, $event)"
+                                [aria-description]="'press enter to edit ' + property">
+                                {{property}}
+                                <button matChipRemove [attr.aria-label]="'remove ' + property">
+                                    <mat-icon>cancel</mat-icon>
+                                </button>
+                            </mat-chip-row>
+                            }
+                            <input placeholder="New property..." [matChipInputFor]="chipPropertiesGrid"
+                                [matChipInputSeparatorKeyCodes]="separatorKeysCodes" [matChipInputAddOnBlur]="true"
+                                (matChipInputTokenEnd)="addPropertyQName($event)" />
+                        </mat-chip-grid>
+                    </mat-form-field>
+                    <div class="prefixes-container" formArrayName="prefixes" matTooltip="Prefixes and namespaces to be used in the Turtle and SPARQL queries"
+                        matTooltipPosition="above">
+                        <h3 align="center">Prefixes</h3>
+                        @for (prefixCtrl of prefixArray.controls; track $index) {
+                        <div class="prefix-container" formGroupName="{{$index}}">
+                            <!-- <mat-form-field class="prefix-key">
+                                <mat-label>prefix</mat-label>
+                                <input matInput formControlName="key" required>
+                                @if (prefixArray.at($index).get('key')?.hasError('required')) {
+                                <mat-error>This field is <strong>required</strong></mat-error>
+                                }
+                            </mat-form-field> -->
+                            <mat-form-field class="prefix-key">
+                                <mat-label>prefix</mat-label>
+                                <input type="text" matInput formControlName="key" [matAutocomplete]="auto"
+                                    (keydown.enter)="selectPrefix($index)">
+                                @if (prefixArray.at($index).get('key')?.hasError('required')) {
+                                <mat-error>This field is <strong>required</strong></mat-error>
+                                }
+                                <mat-autocomplete #auto="matAutocomplete" (optionSelected)="selectPrefix($index)">
+                                    @for (option of filteredPrefixOptions[$index] | async; track $index) {
+                                    <mat-option [value]="option.shortName">
+                                        {{ option.shortName }} => {{option.iri }}
+                                    </mat-option>
+                                    }
+                                </mat-autocomplete>
+                            </mat-form-field>
+                            <mat-form-field class="prefix-value">
+                                <mat-label>value</mat-label>
+                                <input matInput formControlName="value" required>
+                                @if (prefixArray.at($index).get('value')?.hasError('required')) {
+                                <mat-error>This field is <strong>required</strong></mat-error>
+                                }
+                                @if (prefixArray.at($index).get('value')?.hasError('pattern')) {
+                                <mat-error>Please enter a valid URI</mat-error>
+                                }
+                            </mat-form-field>
+                            <button mat-mini-fab class="warn-mini-fab-button"
+                                (click)="deletePrefix(prefixCtrl.get('key')?.value, $index)">
+                                <mat-icon>delete</mat-icon>
+                            </button>
+                        </div>
+                        <!-- <div>
+                            {{filterPrefixes(prefixCtrl.get('key')?.value) |json}}
+                        </div> -->
+                        }
+
+                        <button mat-raised-button (click)="addPrefix()">
+                            <mat-icon>add</mat-icon>
+                            Add prefix
+                        </button>
+                    </div>
+                    <mat-form-field matTooltip="Named graphs where to look for ontology definitions (optional)" matTooltipPosition="above">
+                        <mat-label>Ontology named graphs</mat-label>
+                        <mat-chip-grid #chipOntologyNamedGraphsGrid aria-label="Enter named graph">
+                            @for (property of configuration().ontology_named_graphs; track property) {
+                            <mat-chip-row (removed)="removeOntologyNamedGraphs(property)" [editable]="true"
+                                (edited)="editOntologyNamedGraphs(property, $event)"
+                                [aria-description]="'press enter to edit ' + property">
+                                {{property}}
+                                <button matChipRemove [attr.aria-label]="'remove ' + property">
+                                    <mat-icon>cancel</mat-icon>
+                                </button>
+                            </mat-chip-row>
+                            }
+                            <input placeholder="New named graph..." [matChipInputFor]="chipOntologyNamedGraphsGrid"
+                                [matChipInputSeparatorKeyCodes]="separatorKeysCodes" [matChipInputAddOnBlur]="true"
+                                (matChipInputTokenEnd)="addOntologyNamedGraphs($event)" />
+                        </mat-chip-grid>
+                    </mat-form-field>
+                    <mat-form-field matTooltip="Optional list of classes and namespaces to be excluded from the similar classes (optional)" matTooltipPosition="above">
+                        <mat-label>Excluded classes namespaces</mat-label>
+                        <mat-chip-grid #chipExcludedClassesNamespacesGrid aria-label="Enter namespace">
+                            @for (property of configuration().excluded_classes_namespaces; track property) {
+                            <mat-chip-row (removed)="removeExcludedClassesNamespaces(property)" [editable]="true"
+                                (edited)="editExcludedClassesNamespaces(property, $event)"
+                                [aria-description]="'press enter to edit ' + property">
+                                {{property}}
+                                <button matChipRemove [attr.aria-label]="'remove ' + property">
+                                    <mat-icon>cancel</mat-icon>
+                                </button>
+                            </mat-chip-row>
+                            }
+                            <input placeholder="New namespace..." [matChipInputFor]="chipExcludedClassesNamespacesGrid"
+                                [matChipInputSeparatorKeyCodes]="separatorKeysCodes" [matChipInputAddOnBlur]="true"
+                                (matChipInputTokenEnd)="addExcludedClassesNamespaces($event)" />
+                        </mat-chip-grid>
+                    </mat-form-field>
+
+                    <div class="query-examples-container" formArrayName="queryExamples" matTooltip="Query examples to be used in the generation of the query"
+                        matTooltipPosition="above">
+                        <h3 align="center">Query Examples</h3>
+                        @for (queryExamplesCtrl of queryExamplesArray.controls; track $index) {
+                        <div class="query-example-container" formGroupName="{{$index}}">
+                            <mat-form-field class="query-example-question">
+                                <mat-label>question</mat-label>
+                                <input matInput formControlName="question" required>
+                                @if (queryExamplesArray.at($index).get('question')?.hasError('required')) {
+                                <mat-error>This field is <strong>required</strong></mat-error>
+                                }
+                            </mat-form-field>
+                            <mat-form-field class="query-example-query">
+                                <mat-label>query</mat-label>
+                                <textarea matInput rows="10" formControlName="query" required></textarea>
+                                @if (queryExamplesArray.at($index).get('query')?.hasError('required')) {
+                                <mat-error>This field is <strong>required</strong></mat-error>
+                                }
+                            </mat-form-field>
+                            <div class="query-example-actions">
+                                <div class="refine-query-container">
+                                    <a mat-fab extended target="_blank" routerLink="/sparql-query-refinement" [queryParams]="{query: queryExamplesArray.at($index).get('query')?.value,
+                                         question: queryExamplesArray.at($index).get('question')?.value}">
+                                        <mat-icon>edit</mat-icon>
+                                        Refine Query
+                                    </a>
+                                </div>
+                                <button mat-mini-fab class="warn-mini-fab-button"
+                                    (click)="deleteQueryExample(queryExamplesCtrl.get('question')?.value,
+                                        queryExamplesCtrl.get('query')?.value)">
+                                    <mat-icon>delete</mat-icon>
+                                </button>
+
+                            </div>
+                        </div>
+                        }
+
+                        <button mat-raised-button (click)="addQueryExample()">
+                            <mat-icon>add</mat-icon>
+                            Add Query Example
+                        </button>
+                    </div>
+                </div>
+                @if (isInConfigCreatedTask) {
+                <mat-spinner></mat-spinner>
+                }
+            </form>
+            <div class="stepper-actions">
+                <button mat-raised-button (click)="createConfiguration()">
+                    <mat-icon>add</mat-icon>
+                    Create configuration
+                </button>
+                <button mat-raised-button matStepperNext [disabled]="!isConfigCreated">
+                    Next
+                    <mat-icon matSuffix>skip_next</mat-icon>
+                </button>
+            </div>
+        </mat-step>
+        <mat-step [completed]="isKGDescriptionsGenerated" [editable]="isEditable">
+            <form [formGroup]="secondFormGroup">
+                <ng-template matStepLabel>Generate KG Descriptions</ng-template>
+                <div class="form-group-container">
+                    <mat-form-field>
+                        <mat-label>KG short Name</mat-label>
+                        <input matInput formControlName="kg_short_name" required>
+                    </mat-form-field>
+
+                    <button mat-raised-button (click)="activateConfiguration()" [disabled]="isConfigActivated">
+                        Activate configuration
+                        <mat-icon matSuffix>create</mat-icon>
+                    </button>
+                    @if (isInConfigActivatedTask) {
+                    <mat-spinner></mat-spinner>
+                    }
+                    <button mat-raised-button (click)="generateKGDescriptions()"
+                        [disabled]="!isConfigActivated || isKGDescriptionsGenerated">
+                        Generate KG descriptions
+                        <mat-icon matSuffix>create</mat-icon>
+                    </button>
+                    @if (isInKGDescriptionsGeneratedTask) {
+                    <mat-spinner></mat-spinner>
+                    }
+                </div>
+            </form>
+            <div class="stepper-actions">
+                <button mat-raised-button matStepperNext [disabled]="!isKGDescriptionsGenerated">
+                    Next
+                    <mat-icon matSuffix>skip_next</mat-icon>
+                </button>
+            </div>
+        </mat-step>
+        <mat-step [completed]="isKGEmbeddingGenerated" [editable]="isEditable">
+            <form [formGroup]="thirdFormGroup">
+                <ng-template matStepLabel>Class & Example Embeddings</ng-template>
+                <div class="form-group-container">
+                    <mat-form-field>
+                        <mat-label>KG short Name</mat-label>
+                        <input matInput formControlName="kg_short_name" required>
+                    </mat-form-field>
+
+                    <button mat-raised-button (click)="generateKGEmbeddings()" [disabled]="isKGEmbeddingGenerated">
+                        Generate KG embeddings
+                        <mat-icon matSuffix>create</mat-icon>
+                    </button>
+                </div>
+                @if (isInKGEmbeddingGeneratedTask) {
+                <mat-spinner></mat-spinner>
+                }
+                <div class="stepper-actions">
+                    <button mat-raised-button matStepperNext [disabled]="!isKGEmbeddingGenerated">
+                        Next
+                        <mat-icon matSuffix>skip_next</mat-icon>
+                    </button>
+                </div>
+            </form>
+        </mat-step>
+        <mat-step>
+            <ng-template matStepLabel>Done</ng-template>
+            <p>You are now done.</p>
+            <div class="stepper-actions">
+                <button mat-raised-button (click)="stepper.reset()">
+                    <mat-icon matSuffix>replay</mat-icon>
+                    Reset
+                </button>
+            </div>
+        </mat-step>
+    </mat-stepper>
+
+</div>

@@ -1,0 +1,143 @@
+@use "../../../styles/_variables" as *;
+@use '@angular/material' as mat;
+
+.container {
+    display: flex;
+    flex-direction: column;
+}
+
+.question-input {
+    flex: 1;
+}
+
+.question-container {
+    position: sticky;
+    bottom: 0px;
+    // left: 5%;
+    // right: 5%;
+
+    display: flex;
+    gap: 16px;
+
+    background-color: #fff;
+    padding: 10px;
+
+    border-radius: 20px;
+    border-top: 1px solid #ccc;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    margin-bottom: 96px;
+    min-height: 40vh;
+}
+
+.message {
+    z-index: 0;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 70%;
+    box-shadow: 5px 10px 10px rgba(0, 0, 0, 0.3);
+    border-left: #15008f 8px solid;
+}
+
+.user-message {
+    align-self: flex-end;
+    @include mat.expansion-overrides((container-background-color: $user-message-background-color));
+
+    mat-expansion-panel-header {
+        background-color: rgb(197, 197, 197);
+        margin-bottom: 16px;
+
+    }
+}
+
+.system-message {
+    align-self: flex-start;
+    @include mat.expansion-overrides((container-background-color: $system-message-background-color));
+
+    mat-expansion-panel-header {
+        background-color: rgb(197, 197, 197);
+        margin-bottom: 16px;
+    }
+}
+
+.llm-message {
+
+    mat-expansion-panel-header {
+        background-color: rgb(183, 221, 183);
+    }
+
+    border-left: #218f00 8px solid;
+
+}
+
+
+.message-sender {
+    font-size: 0.7rem;
+    color: #15008f;
+    background-color: #fff;
+    border-radius: 6px;
+    padding: 3px;
+}
+
+.upload-question-container {
+
+    margin-top: auto;
+    display: flex;
+    gap: 16px;
+
+
+    // mat-form-field {
+    //     flex: 1;
+    // }
+}
+
+.upload-question-input {
+    height: 250px;
+}
+
+.expand-all-container {
+    margin: 0 auto;
+    padding: 16px;
+    border: #15008f 2px solid;
+    border-radius: 16px;
+}
+
+.refine-query-container {
+    display: flex;
+    justify-content: center;
+
+    a {
+        background-color: rgb(183, 221, 183);
+    }
+}
+
+.dataset-buttons{
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.activate-config-container{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin: 16px;
+}
+
+.bulb-icon {
+    margin-left: 16px;
+    font-size: 32px;
+    // animation: fontPulse 1s ease-in-out infinite alternate;
+    border: 2px solid;
+    border-radius: 8px;
+    padding: 8px;
+    // cursor: pointer;
+}

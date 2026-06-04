@@ -1,0 +1,9 @@
+# Find DBLP journals and their titles.
+
+PREFIX dblp: <https://dblp.org/rdf/schema#>
+
+SELECT ?journal ?journalTitle WHERE {
+  ?journal a dblp:Journal ;
+           dblp:primaryStreamTitle ?journalTitle .
+}
+LIMIT 20

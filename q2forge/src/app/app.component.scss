@@ -1,0 +1,104 @@
+@use "../styles/_variables" as *;
+
+.container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+
+    width: 80%;
+    margin: 0 auto;
+    max-width: 1200px;
+
+}
+
+@media screen and (max-width: 768px) {
+    .container {
+        width: 100%;
+    }
+
+}
+
+.toolbar {
+    background-color: $primary-color;
+    display: flex;
+    justify-content: space-between;
+}
+
+.toolbar-left {
+    display: flex;
+    align-items: center;
+}
+
+.toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+h1.example-app-name {
+    margin-left: 8px;
+}
+
+.sidenav-container {
+    flex: 1;
+    background-color: $primary-color;
+}
+
+.sidenav {
+    height: 85%;
+    width: 300px;
+    background-color: $primary-color;
+}
+
+.sidenav-content {
+    border: 1px solid black;
+    border-radius: 16px;
+    padding: 8px;
+}
+
+.sidenav-item {
+    cursor: pointer;
+    border: 1px dashed black;
+    margin: 8px;
+    width: 95%;
+    border-radius: 16px;
+}
+
+.sparql-generator-click-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 32px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    width: 85%;
+}
+
+.sparql-generator-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 32px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    width: 85%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border: rgb(110, 110, 110) 2px solid;
+    border-radius: 8px;
+}
+
+
+
+.warn-mini-fab-button {
+    display: none;
+    color: rgb(240, 233, 233);
+    background-color: rgb(228, 31, 31);
+    margin-right: 8px;
+}
+
+
+.sparql-generator-item:hover .warn-mini-fab-button {
+  display: inline-block;
+}

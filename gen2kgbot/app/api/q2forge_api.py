@@ -1,0 +1,1260 @@
+from datetime import timedelta
+import json
+from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi.responses import StreamingResponse
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi_mcp import AuthConfig, FastApiMCP
+from app.api.database.configuration import (
+    add_configuration,
+    get_available_configurations,
+    get_configuration,
+    get_user_active_config,
+)
+from app.api.database.user import (
+    delete_user_chat_from_history,
+    update_active_config,
+    update_user_chat_history,
+    update_user_free_cq_quota,
+    update_user_free_sparql_generation_quota,
+    update_user_free_sparql_judging_quota,
+)
+from app.api.models.token import Token
+from app.api.models.user import SparqlGenerationChat, UserResponse, UserSignUp
+from app.api.requests.activate_config import ActivateConfig
+from app.api.requests.answer_question import AnswerQuestion
+from app.api.requests.create_config import CreateConfig
+from app.api.requests.generate_competency_question import GenerateCompetencyQuestion
+from app.api.requests.refine_query import RefineQuery
+from app.api.responses.kg_config import KGConfig
+from app.api.responses.scenario_schema import ScenarioSchema
+from app.api.services.answer_question import answer_question
+from app.api.services.auth import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    authenticate_user,
+    create_access_token,
+    create_new_user,
+    get_current_active_user,
+    get_current_user,
+)
+from app.api.services.config_manager import (
+    add_missing_config_params,
+    save_query_examples_to_file,
+)
+from app.api.services.generate_competency_question import generate_competency_questions
+from fastapi.middleware.cors import CORSMiddleware
+from app.api.services.graph_mermaid import get_scenarios_schema
+from app.api.services.refine_query import refine_query
+from app.preprocessing.gen_descriptions import GenDescriptions
+from app.utils.config_manager import ConfigManager
+from app.utils.construct_util import ConstructUtil
+from app.utils.logger_manager import setup_logger
+from app.preprocessing.compute_embeddings import ComputeEmbeddings
+import uvicorn
+from fastapi.openapi.docs import get_redoc_html
+
+# setup logger
+logger = setup_logger(__package__, __file__)
+
+# setup FastAPI
+app = FastAPI(
+    title="Q²Forge API",
+    docs_url="/api/q2forge/swagger",
+    openapi_url="/api/q2forge/openapi.json",
+    redoc_url=None,
+    description=(
+        "**Q²Forge** is a resource that addresses the challenge of generating new competency questions for a KG and corresponding SPARQL queries that reflect those questions. It iteratively validates those queries with human "
+        + "feedback and LLM as a judge. Q²Forge is open source, extensible and modular, meaning that different parts of the system (CQ generation, query generation and query refinement) can be used as a whole or as parts depending on the context, "
+        + "or replaced by alternative services. The end result is a complete pipeline from competency question formulation to query evaluation, supporting the creation of reference query sets for any target KG."
+    ),
+    version="2.0",
+)
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/api/q2forge/docs", include_in_schema=False)
+async def redoc_html():
+    return get_redoc_html(
+        openapi_url=app.openapi_url,
+        title=app.title + " - ReDoc",
+        redoc_js_url="https://unpkg.com/redoc@2/bundles/redoc.standalone.js",
+    )
+
+
+@app.get(
+    path="/api/q2forge/config/available",
+    summary="Get the Available Configurations",
+    operation_id="get_available_configurations",
+    description=(
+        "This endpoint returns the short name of each available configuration that can be used by the Q²Forge resource."
+    ),
+    responses={
+        200: {
+            "description": "A list of the configuration short names.",
+            "content": {"application/json": {"example": ["idsm", "d2kab"]}},
+        }
+    },
+)
+def get_available_configurations_endpoint(
+    current_user: UserResponse = Depends(get_current_active_user),
+) -> list[str]:
+    return get_available_configurations()
+
+
+@app.get(
+    path="/api/q2forge/config/active",
+    operation_id="get_active_config",
+    summary="Get the currently active configuration",
+    description=(
+        "This endpoint returns the currently active configuration of the Q²Forge API. "
+        + "The configuration contains information about the knowledge graph, "
+        + "the SPARQL endpoint, the properties to be used, the prefixes, and the models to be used for each scenario."
+    ),
+    responses={
+        200: {
+            "description": "The currently active configuration",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "kg_full_name": "PubChem knowledge graph",
+                        "kg_short_name": "idsm",
+                        "kg_description": "The IDSM SPARQL endpoint provides fast similarity and structural search functionality in knowledge graph such as ChEMBL, ChEBI or PubChem.",
+                        "kg_sparql_endpoint_url": "https://idsm.elixir-czech.cz/sparql/endpoint/idsm",
+                        "ontologies_sparql_endpoint_url": "http://gen2kgbot.i3s.unice.fr/corese",
+                        "properties_qnames_info": [
+                            "rdfs:label",
+                            "skos:prefLabel",
+                            "skos:altLabel",
+                            "schema:name",
+                            "schema:alternateName",
+                            "obo:IAO_0000118",
+                            "obo:OBI_9991118",
+                            "obo:OBI_0001847",
+                            "rdfs:comment",
+                            "skos:definition",
+                            "dc:description",
+                            "dcterms:description",
+                            "schema:description",
+                            "obo:IAO_0000115",
+                        ],
+                        "prefixes": {
+                            "bao": "http://www.bioassayontology.org/bao#",
+                            "biopax": "http://www.biopax.org/release/biopax-level3.owl#",
+                            "cito": "http://purl.org/spar/cito/",
+                            "chembl": "http://rdf.ebi.ac.uk/terms/chembl#",
+                            "dc": "http://purl.org/dc/elements/1.1/",
+                            "dcterms": "http://purl.org/dc/terms/",
+                            "enpkg": "https://enpkg.commons-lab.org/kg/",
+                            "enpkg_module": "https://enpkg.commons-lab.org/module/",
+                            "fabio": "http://purl.org/spar/fabio/",
+                            "foaf": "http://xmlns.com/foaf/0.1/",
+                            "frbr": "http://purl.org/vocab/frbr/core#",
+                            "ndfrt": "http://purl.bioontology.org/ontology/NDFRT/",
+                            "obo": "http://purl.obolibrary.org/obo/",
+                            "owl": "http://www.w3.org/2002/07/owl#",
+                            "patent": "http://data.epo.org/linked-data/def/patent/",
+                            "pav": "http://purl.org/pav/",
+                            "pubchem": "http://rdf.ncbi.nlm.nih.gov/pubchem/vocabulary#",
+                            "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+                            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+                            "schema": "http://schema.org/",
+                            "skos": "http://www.w3.org/2004/02/skos/core#",
+                            "sio": "http://semanticscience.org/resource/",
+                            "snomedct": "http://purl.bioontology.org/ontology/SNOMEDCT/",
+                            "xsd": "http://www.w3.org/2001/XMLSchema#",
+                            "up": "http://purl.uniprot.org/core/",
+                        },
+                        "excluded_classes_namespaces": [
+                            "http://data.epo.org/linked-data/def/patent/Publication",
+                            "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#",
+                        ],
+                        "seq2seq_models": {
+                            "llama3_2-1b@local": {
+                                "server_type": "ollama",
+                                "id": "llama3.2:1b",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "llama3_2:3b@local": {
+                                "server_type": "ollama",
+                                "id": "llama3.2:latest",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "gemma-3_1b@local": {
+                                "server_type": "ollama",
+                                "id": "gemma3:1b",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "gemma-3_4b@local": {
+                                "server_type": "ollama",
+                                "id": "gemma3:4b",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "gemma-3_12b@local": {
+                                "server_type": "ollama",
+                                "id": "gemma3:12b",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "gemma-3_27b@local": {
+                                "server_type": "ollama",
+                                "id": "gemma3:27b",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "deepseek-r1_1_5b@local": {
+                                "server_type": "ollama",
+                                "id": "deepseek-r1:1.5b",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "llama-3_1-70B@ovh": {
+                                "server_type": "ovh",
+                                "id": "Meta-Llama-3_1-70B-Instruct",
+                                "base_url": "https://llama-3-1-70b-instruct.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "llama-3_3-70B@ovh": {
+                                "server_type": "ovh",
+                                "id": "Meta-Llama-3_3-70B-Instruct",
+                                "base_url": "https://llama-3-3-70b-instruct.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "llama-3_1-8B@ovh": {
+                                "server_type": "ovh",
+                                "id": "Llama-3.1-8B-Instruct",
+                                "base_url": "https://llama-3-1-8b-instruct.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1/",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "deepseek-r1-70B@ovh": {
+                                "server_type": "ovh",
+                                "id": "DeepSeek-R1-Distill-Llama-70B",
+                                "base_url": "https://deepseek-r1-distill-llama-70b.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "gpt-4o@openai": {
+                                "server_type": "openai",
+                                "id": "gpt-4o",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "o3-mini@openai": {
+                                "server_type": "openai",
+                                "id": "o3-mini",
+                            },
+                            "o1@openai": {"server_type": "openai", "id": "o1"},
+                            "deepseek-chat@deepseek": {
+                                "server_type": "deepseek",
+                                "id": "deepseek-chat",
+                                "base_url": "https://api.deepseek.com",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "deepseek-reasoner@deepseek": {
+                                "server_type": "deepseek",
+                                "id": "deepseek-reasoner",
+                                "base_url": "https://api.deepseek.com",
+                                "temperature": 0,
+                                "max_retries": 3,
+                                "top_p": 0.95,
+                            },
+                            "deepseek-reasoner@hf": {
+                                "server_type": "hugface",
+                                "id": "deepseek-ai/DeepSeek-R1",
+                                "base_url": "https://huggingface.co/api/inference-proxy/together",
+                                "top_p": 0.95,
+                            },
+                        },
+                        "text_embedding_models": {
+                            "nomic-embed-text_faiss@local": {
+                                "server_type": "ollama-embeddings",
+                                "id": "nomic-embed-text",
+                                "vector_db": "faiss",
+                            },
+                            "mxbai-embed-large_faiss@local": {
+                                "server_type": "ollama-embeddings",
+                                "id": "mxbai-embed-large",
+                                "vector_db": "faiss",
+                            },
+                            "nomic-embed-text_chroma@local": {
+                                "server_type": "ollama-embeddings",
+                                "id": "nomic-embed-text",
+                                "vector_db": "chroma",
+                            },
+                        },
+                        "scenario_1": {
+                            "validate_question": "deepseek-reasoner@hf",
+                            "ask_question": "llama3_2-1b@local",
+                        },
+                        "scenario_2": {
+                            "validate_question": "llama3_2-1b@local",
+                            "generate_query": "llama-3_1-70B@ovh",
+                            "interpret_results": "llama3_2-1b@local",
+                        },
+                        "scenario_3": {
+                            "validate_question": "llama3_2-1b@local",
+                            "generate_query": "llama-3_1-70B@ovh",
+                            "interpret_results": "llama3_2-1b@local",
+                            "text_embedding_model": "nomic-embed-text_faiss@local",
+                        },
+                        "scenario_4": {
+                            "validate_question": "llama-3_1-70B@ovh",
+                            "generate_query": "llama3_2-1b@local",
+                            "interpret_results": "llama3_2-1b@local",
+                            "text_embedding_model": "nomic-embed-text_faiss@local",
+                        },
+                        "scenario_5": {
+                            "validate_question": "llama3_2-1b@local",
+                            "generate_query": "llama3_2-1b@local",
+                            "interpret_results": "llama-3_1-70B@ovh",
+                            "text_embedding_model": "nomic-embed-text_faiss@local",
+                        },
+                        "scenario_6": {
+                            "validate_question": "llama-3_1-70B@ovh",
+                            "generate_query": "deepseek-r1_1_5b@local",
+                            "interpret_results": "llama3_2-1b@local",
+                            "text_embedding_model": "nomic-embed-text_faiss@local",
+                        },
+                        "scenario_7": {
+                            "validate_question": "llama3_2-1b@local",
+                            "generate_query": "llama-3_1-70B@ovh",
+                            "judge_query": "llama-3_1-70B@ovh",
+                            "judge_regenerate_query": "llama-3_1-70B@ovh",
+                            "interpret_results": "llama-3_1-70B@ovh",
+                            "text_embedding_model": "nomic-embed-text_faiss@local",
+                            "judging_grade_threshold_retry": 8,
+                            "judging_grade_threshold_run": 5,
+                        },
+                    }
+                }
+            },
+        }
+    },
+)
+def get_active_config_endpoint(
+    current_user: UserResponse = Depends(get_current_active_user),
+) -> KGConfig:
+
+    active_config = get_user_active_config(current_user.username)
+    if active_config is None:
+        raise HTTPException(status_code=400, detail="No active configuration found")
+
+    return active_config
+
+
+@app.get(
+    path="/api/q2forge/scenarios_graph_schema",
+    summary="Get the scenarios graph schemas",
+    operation_id="get_scenarios_graph_schema",
+    description=(
+        "This endpoint returns the different scenarios graph schemas. "
+        + "The schemas are represented in a mermaid format, which can be used to visualize the flow of the scenarios."
+    ),
+    responses={
+        200: {
+            "description": "A list containing the different scenarios schemas",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "scenario_id": 1,
+                            "schema": "```mermaid\n%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\t__start__([<p>__start__</p>]):::first\n\tinit(init)\n\tvalidate_question(validate_question)\n\task_question(ask_question)\n\t"
+                            + "__end__([<p>__end__</p>]):::last\n\t__start__ --> init;\n\task_question --> __end__;\n\tinit --> validate_question;\n\tvalidate_question -.-> ask_question;\n\tvalidate_question -.-> __end__;\n\t"
+                            + "classDef default fill:#f2f0ff,line-height:1.2\n\tclassDef first fill-opacity:0\n\tclassDef last fill:#bfb6fc\n\n```",
+                        },
+                        {
+                            "scenario_id": 2,
+                            "schema": "```mermaid\n ...```",
+                        },
+                    ]
+                }
+            },
+        }
+    },
+)
+def get_scenario_schema_endpoint() -> list[ScenarioSchema]:
+    return get_scenarios_schema()
+
+
+@app.post(
+    path="/api/q2forge/config/create",
+    operation_id="create_config",
+    summary="Create a new configuration",
+    description=(
+        "This endpoint creates a new configuration file to be used by the Q²Forge resource. "
+        + "The configuration file contains information about a knowledge graph, "
+    ),
+    responses={
+        200: {
+            "description": "The created configuration",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "kg_full_name": "WheatGenomic Scienctific Literature Knowledge Graph",
+                        "kg_short_name": "d2kab",
+                        "kg_description": "The Wheat Genomics Scientific Literature Knowledge Graph (WheatGenomicsSLKG) is a FAIR knowledge graph that exploits the Semantic Web technologies to describe PubMed scientific articles on wheat genetics"
+                        + " and genomics. It represents Named Entities (NE) about genes, phenotypes, taxa and varieties, mentioned in the title and the abstract of the articles, and the relationships between wheat mentions of varieties"
+                        + " and phenotypes.",
+                        "kg_sparql_endpoint_url": "http://d2kab.i3s.unice.fr/sparql",
+                        "ontologies_sparql_endpoint_url": "http://d2kab.i3s.unice.fr/sparql",
+                        "properties_qnames_info": [],
+                        "prefixes": {
+                            "bibo": "http://purl.org/ontology/bibo/",
+                            "d2kab": "http://ns.inria.fr/d2kab/",
+                            "dc": "http://purl.org/dc/elements/1.1/",
+                            "dcterms": "http://purl.org/dc/terms/",
+                            "fabio": "http://purl.org/spar/fabio/",
+                            "foaf": "http://xmlns.com/foaf/0.1/",
+                            "frbr": "http://purl.org/vocab/frbr/core#",
+                            "obo": "http://purl.obolibrary.org/obo/",
+                            "oio": "http://www.geneontology.org/formats/oboInOwl#",
+                            "oa": "http://www.w3.org/ns/oa#",
+                            "owl": "http://www.w3.org/2002/07/owl#",
+                            "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+                            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+                            "schema": "http://schema.org/",
+                            "skos": "http://www.w3.org/2004/02/skos/core#",
+                            "xsd": "http://www.w3.org/2001/XMLSchema#",
+                            "wto": "http://opendata.inrae.fr/wto/",
+                        },
+                        "ontology_named_graphs": [
+                            "http://ns.inria.fr/d2kab/graph/wheatgenomicsslkg",
+                            "http://ns.inria.fr/d2kab/ontology/wto/v3",
+                            "http://purl.org/dc/elements/1.1/",
+                            "http://purl.org/dc/terms/",
+                            "http://purl.org/obo/owl/",
+                            "http://purl.org/ontology/bibo/",
+                            "http://purl.org/spar/fabio",
+                            "http://purl.org/vocab/frbr/core#",
+                            "http://www.w3.org/2002/07/owl#",
+                            "http://www.w3.org/2004/02/skos/core",
+                            "http://www.w3.org/ns/oa#",
+                        ],
+                        "excluded_classes_namespaces": [],
+                        "queryExamples": [
+                            {
+                                "question": "Retrieve genes that are mentioned proximal to the a given phenotype (resistance to leaf rust in this example).",
+                                "query": "prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> \nprefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> \nprefix xsd:     <http://www.w3.org/2001/XMLSchema#> \n"
+                                + "prefix schema:  <http://schema.org/> \nprefix owl:     <http://www.w3.org/2002/07/owl#> \nprefix skos:    <http://www.w3.org/2004/02/skos/core#> \nprefix oa:      <http://www.w3.org/ns/oa#> \n"
+                                + "prefix ncbi:    <http://identifiers.org/taxonomy/> \nprefix dct:     <http://purl.org/dc/terms/> \nprefix frbr:    <http://purl.org/vocab/frbr/core#> \nprefix fabio:   <http://purl.org/spar/fabio/> \n"
+                                + "prefix obo:     <http://purl.obolibrary.org/obo/> \nprefix bibo:    <http://purl.org/ontology/bibo/> \nprefix d2kab:   <http://ns.inria.fr/d2kab/> \nprefix dc:      <http://purl.org/dc/terms/> \n"
+                                + "prefix d2kab_bsv:   <http://ontology.inrae.fr/bsv/ontology/>\nprefix dul: <http://www.ontologydesignpatterns.org/ont/dul/DUL.owl#>\nprefix dct:     <http://purl.org/dc/terms/> \n"
+                                + "prefix taxref: <http://taxref.mnhn.fr/lod/property/>\n\nSELECT ?GeneName (count(distinct ?paper) as ?NbOcc)\nFROM NAMED <http://ns.inria.fr/d2kab/graph/wheatgenomicsslkg>\n"
+                                + "FROM NAMED <http://ns.inria.fr/d2kab/ontology/wto/v3>\nWHERE {\n  GRAPH <http://ns.inria.fr/d2kab/graph/wheatgenomicsslkg> { \n     ?a1 a oa:Annotation; \n      oa:hasTarget [ oa:hasSource ?source1 ] ;  \n"
+                                + "oa:hasBody ?WTOtraitURI .\n\n   ?source1 frbr:partOf+ ?paper .\n    \n   ?a a oa:Annotation ; \n      oa:hasTarget [ oa:hasSource ?source ] ;\n      oa:hasBody [ a d2kab:Gene; skos:prefLabel ?GeneName ].\n\n"
+                                + '?source frbr:partOf+ ?paper.\n\n   ?paper a fabio:ResearchPaper.\n}\n   GRAPH <http://ns.inria.fr/d2kab/ontology/wto/v3> {\n       ?WTOtraitURI skos:prefLabel "resistance to Leaf rust" .\n}\n}\n'
+                                + "GROUP BY ?GeneName \nHAVING (count(distinct ?paper) > 1)\nORDER BY DESC(?NbOcc)",
+                            }
+                        ],
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "The configuration file already exists",
+            "content": {
+                "application/json": {
+                    "example": {"error": "Configuration file already exists: d2kab"}
+                }
+            },
+        },
+        500: {
+            "description": "An error occurred while creating the configuration",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Error creating configuration file: <error_message>"
+                    }
+                }
+            },
+        },
+    },
+)
+def create_config_endpoint(
+    config_request: CreateConfig,
+    current_user: UserResponse = Depends(get_current_active_user),
+) -> CreateConfig:
+    try:
+
+        logger.debug(f"Received configuration request: {config_request}")
+
+        config = get_configuration(config_request.kg_short_name)
+
+        # Check if the config already exists
+        if config is not None:
+            logger.error(
+                f"Configuration with short name {config_request.kg_short_name} already exists"
+            )
+            return Response(
+                status_code=400,
+                content=json.dumps(
+                    {
+                        "error": f"Configuration with the same short name already exists: {config_request.kg_short_name}"
+                    }
+                ),
+                media_type="application/json",
+            )
+
+        # Save the query examples locally to be used in the embedding
+        save_query_examples_to_file(
+            kg_short_name=config_request.kg_short_name,
+            query_examples=config_request.queryExamples,
+        )
+
+        # Convert the request to a dictionary
+        config_dict = config_request.model_dump()
+
+        # Remove the query examples from the request to avoid adding them to the config file
+        del config_dict["queryExamples"]
+
+        # Add missing parameters to the configuration
+        updated_config = add_missing_config_params(config_dict)
+
+        # Save the configuration to the database
+        add_configuration(updated_config)
+
+        logger.info(f"Configuration saved successfully: {config_request.kg_short_name}")
+
+        return Response(
+            status_code=200,
+            content=config_request.model_dump_json(),
+            media_type="application/json",
+        )
+    except Exception as e:
+        logger.error(f"Error creating configuration file: {str(e)}")
+        return Response(
+            status_code=500,
+            content={"error": f"Error creating configuration file: {str(e)}"},
+            media_type="application/json",
+        )
+
+
+@app.post(
+    path="/api/q2forge/config/activate",
+    operation_id="activate_config",
+    summary="Activate a configuration",
+    description=(
+        "This endpoint activates a configuration file to be used by the Q²Forge resource. "
+    ),
+    responses={
+        200: {
+            "description": "The short name of the activated configuration",
+            "content": {"application/json": {"example": {"kg_short_name": "d2kab"}}},
+        },
+        400: {
+            "description": "The configuration file does not exist",
+            "content": {
+                "application/json": {
+                    "example": {"error": "Configuration file does not exist: d2kab"}
+                }
+            },
+        },
+        500: {
+            "description": "An error occurred while activating the configuration",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Error activating configuration file: <error_message>"
+                    }
+                }
+            },
+        },
+    },
+)
+def activate_config_endpoint(
+    config_request: ActivateConfig,
+    current_user: UserResponse = Depends(get_current_active_user),
+) -> KGConfig:
+    try:
+        logger.info(
+            f"starting activation of configuration {config_request.kg_short_name}"
+        )
+        newConfig = update_active_config(current_user, config_request.kg_short_name)
+        logger.info(f"Configuration file activated: {config_request.kg_short_name}")
+        return newConfig
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+    # try:
+
+    #     logger.debug(f"Configuration to activate: {config_request}")
+
+    #     config_to_activate_path = (
+    #         Path(__file__).resolve().parent.parent.parent
+    #         / "config"
+    #         / f"params_{config_request.kg_short_name}.yml"
+    #     )
+
+    #     # Check if the file already exists
+    #     if not config_to_activate_path.exists():
+    #         logger.error(
+    #             f"Configuration file does not exist at {config_to_activate_path}"
+    #         )
+    #         return Response(
+    #             status_code=400,
+    #             content=json.dumps(
+    #                 {
+    #                     "error": f"Configuration file does not exist {config_request.kg_short_name}"
+    #                 }
+    #             ),
+    #             media_type="application/json",
+    #         )
+
+    #     active_config_path = (
+    #         Path(__file__).resolve().parent.parent.parent / "config" / "params.yml"
+    #     )
+
+    #     with open(config_to_activate_path, "r", encoding="utf-8") as file_to_activate:
+    #         config_data = yaml.safe_load(file_to_activate)
+
+    #         # Activate the configuration
+    #         with open(active_config_path, "w", encoding="utf-8") as active_file:
+    #             yaml.safe_dump(config_data, active_file)
+    #             logger.info(f"Configuration file activated at {active_file}")
+    #             return Response(
+    #                 status_code=200,
+    #                 content=config_request.model_dump_json(),
+    #                 media_type="application/json",
+    #             )
+    # except Exception as e:
+    #     logger.error(f"Error activating configuration file: {str(e)}")
+    #     return Response(
+    #         status_code=500,
+    #         content={"error": f"Error activating configuration file: {str(e)}"},
+    #         media_type="application/json",
+    #     )
+
+
+@app.post(
+    path="/api/q2forge/config/kg_descriptions",
+    operation_id="generate_kg_descriptions",
+    summary="Generate KG descriptions",
+    description=(
+        "This endpoint generates KG descriptions of a given Knowledge Graph. "
+        + "The KG descriptions are used to create KG embeddings, which are then used to provide the language model with more context through a RAG technique."
+    ),
+    responses={
+        200: {
+            "description": "The generated KG descriptions",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "kg_description": {
+                            "classes_description.txt": "('obo:CHEBI_100', '(-)-medicarpin', 'The (-)-enantiomer of medicarpin.')\n...",
+                            "classes_with_instances_description.txt": "('obo:CHEBI_10', '(+)-Atherospermoline', None)\n...",
+                            "properties_description.txt": "('http://prismstandard.org/namespaces/basic/2.0/alternateTitle', 'alternate title. ', 'An alternative title for a resource.')\n...",
+                        }
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "An error occurred while generating the KG descriptions",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Error generating KG descriptions: <error_message>"
+                    }
+                }
+            },
+        },
+    },
+)
+def generate_kg_descriptions_endpoint(
+    active_configuration: KGConfig = Depends(get_active_config_endpoint),
+):
+    try:
+        config = ConfigManager()
+        config.set_configuration(active_configuration.model_dump())
+        constructUtil = ConstructUtil(config)
+        gen_descriptions = GenDescriptions(config=config, constructUtil=constructUtil)
+        gen_descriptions.generate_descriptions()
+
+        directory = config.get_preprocessing_directory()
+        generated_files = {}
+        for file in directory.iterdir():
+            if file.is_file():
+                with file.open("r", encoding="utf-8") as f:
+                    content = f.read()
+                    generated_files[file.name] = content
+
+        return Response(
+            status_code=200,
+            content=json.dumps(generated_files),
+            media_type="application/json",
+        )
+    except Exception as e:
+        logger.error(f"Error generating KG descriptions: {str(e)}")
+        return Response(
+            status_code=500,
+            content={"error": f"Error generating KG descriptions: {str(e)}"},
+            media_type="application/json",
+        )
+
+
+@app.post(
+    path="/api/q2forge/config/kg_embeddings",
+    operation_id="generate_kg_embeddings",
+    summary="Generate KG embeddings",
+    description=(
+        "This endpoint generates the embedding of the textual description of the ontology classes used in the KG. "
+        + "The KG embeddings are used in the different scenarios to generate "
+        + "SPARQL queries from questions in natural language."
+    ),
+    responses={
+        200: {
+            "description": "The generated KG embeddings",
+            "content": {
+                "application/json": {
+                    "example": {"message": "KG embeddings generated successfully"}
+                }
+            },
+        },
+        500: {
+            "description": "An error occurred while generating the KG embeddings",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Error generating KG embeddings: <error_message>"
+                    }
+                }
+            },
+        },
+    },
+)
+def generate_kg_embeddings_endpoint(
+    active_configuration: KGConfig = Depends(get_active_config_endpoint),
+):
+    try:
+        config = ConfigManager()
+        config.set_configuration(active_configuration.model_dump())
+        compute_embeddings = ComputeEmbeddings(config=config)
+        compute_embeddings.start_compute_embeddings(is_api_call=True)
+
+        return Response(
+            status_code=200,
+            content=json.dumps({"message": "KG embeddings generated successfully"}),
+            media_type="application/json",
+        )
+    except Exception as e:
+        logger.error(f"Error generating KG embeddings: {str(e)}")
+        return Response(
+            status_code=500,
+            content={"error": f"Error generating KG embeddings: {str(e)}"},
+            media_type="application/json",
+        )
+
+
+@app.post(
+    path="/api/q2forge/generate_questions",
+    operation_id="generate_questions",
+    summary="Generate competency questions",
+    description=(
+        "This endpoint generates competency questions about a given Knowledge Graph using a given LLM. "
+    ),
+    responses={
+        200: {
+            "description": "The stream of generated competency questions",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {"event": "on_chat_model_start"},
+                        {
+                            "event": "on_chat_model_stream",
+                            "data": "{'question': 'What protein targets does donepezil (CHEBI_53289) inhibit with an IC50 less than 10 µM?'}",
+                        },
+                        {"event": "on_chat_model_end"},
+                    ]
+                }
+            },
+        },
+        403: {
+            "description": "Forbidden: Insufficient free competency question generation quota",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Your free competency question generation quota is 5, which is less than the requested number of questions: 10. Please upgrade your account to generate more questions."
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "An error occurred while generating competency questions",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "Error generating competency questions: <error_message>"
+                    }
+                }
+            },
+        },
+    },
+)
+async def generate_question_endpoint(
+    generate_competency_question_request: GenerateCompetencyQuestion,
+    active_configuration: KGConfig = Depends(get_active_config_endpoint),
+    current_user: UserResponse = Depends(get_current_active_user),
+) -> StreamingResponse:
+
+    if (
+        current_user.free_cq_generation_left
+        < generate_competency_question_request.number_of_questions
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Your free competency question generation quota is {current_user.free_cq_generation_left},"
+            + f" which is less than the requested number of questions: {generate_competency_question_request.number_of_questions}. "
+            + " Please contact the administrator to increase your quota or use the local version.",
+        )
+
+    update_user_free_cq_quota(
+        current_user, generate_competency_question_request.number_of_questions
+    )
+
+    config = ConfigManager()
+    config.set_configuration(active_configuration.model_dump())
+
+    return StreamingResponse(
+        generate_competency_questions(
+            config=config,
+            model_config_id=generate_competency_question_request.model_config_id,
+            number_of_questions=generate_competency_question_request.number_of_questions,
+            additional_context=generate_competency_question_request.additional_context,
+            kg_description=generate_competency_question_request.kg_description,
+            kg_schema=generate_competency_question_request.kg_schema,
+            enforce_structured_output=generate_competency_question_request.enforce_structured_output,
+        ),
+        media_type="application/json",
+    )
+
+
+@app.post(
+    path="/api/q2forge/answer_question",
+    operation_id="answer_question",
+    summary="Generate and Execute a SPARQL query",
+    description=(
+        "This endpoint answers a question about a given Knowledge Graph using a given LLMs configuration."
+    ),
+    responses={
+        200: {
+            "description": "The stream of the answer to the question",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "event": "on_chain_end",
+                            "node": "init",
+                            "data": {"scenario_id": "6"},
+                        },
+                        {
+                            "event": "on_chain_end",
+                            "node": "validate_question",
+                            "data": {"question_validation_results": "true"},
+                        },
+                    ]
+                }
+            },
+        },
+        500: {
+            "description": "An error occurred while answering the question",
+            "content": {
+                "application/json": {
+                    "example": {"error": "Error answering question: <error_message>"}
+                }
+            },
+        },
+    },
+)
+def answer_question_endpoint(
+    answer_question_request: AnswerQuestion,
+    active_configuration: KGConfig = Depends(get_active_config_endpoint),
+    current_user: UserResponse = Depends(get_current_active_user),
+):
+
+    if current_user.free_sparql_query_answers_left == 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your free SPARQL query answer quota is 0."
+            + " Please contact the administrator to increase your quota or use the local version.",
+        )
+
+    update_user_free_sparql_generation_quota(current_user)
+
+    config = ConfigManager()
+    config.set_configuration(active_configuration.model_dump())
+
+    config.set_custom_scenario_configuration(
+        scenario_id=answer_question_request.scenario_id,
+        validate_question_model=answer_question_request.validate_question_model,
+        ask_question_model=answer_question_request.ask_question_model,
+        generate_query_model=answer_question_request.generate_query_model,
+        judge_query_model=answer_question_request.judge_query_model,
+        judge_regenerate_query_model=answer_question_request.judge_regenerate_query_model,
+        interpret_results_model=answer_question_request.interpret_results_model,
+        text_embedding_model=answer_question_request.text_embedding_model,
+    )
+    return StreamingResponse(
+        answer_question(
+            config=config,
+            scenario_id=answer_question_request.scenario_id,
+            question=answer_question_request.question,
+        ),
+        media_type="application/json",
+    )
+
+
+@app.post(
+    path="/api/q2forge/judge_query",
+    operation_id="judge_query",
+    summary="Judge a SPARQL query",
+    description=(
+        "This endpoint judges a SPARQL query given a natural language question using a given LLM."
+    ),
+    responses={
+        200: {
+            "description": "The stream of the model judgement",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {"event": "on_chat_model_start"},
+                        {
+                            "event": "on_chat_model_stream",
+                            "data": "Grade: 8/10\nJustification: The student has attempted to retrieve publications in which genes are mentioned proximal to wheat varieties and traits from a specific class,"
+                            + " e.g., all wheat traits related to resistance to fungal pathogens. The query is well-structured and uses the necessary prefixes for RDF data modeling.",
+                        },
+                        {"event": "on_chat_model_end"},
+                    ]
+                }
+            },
+        },
+        500: {
+            "description": "An error occurred while judging the query",
+            "content": {
+                "application/json": {
+                    "example": {"error": "Error judging query: <error_message>"}
+                }
+            },
+        },
+    },
+)
+async def judge_query_endpoint(
+    refine_query_request: RefineQuery,
+    active_configuration: KGConfig = Depends(get_active_config_endpoint),
+    current_user: UserResponse = Depends(get_current_active_user),
+):
+
+    if current_user.free_sparql_query_judging_left == 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your free SPARQL query judging quota is 0."
+            + " Please contact the administrator to increase your quota or use the local version.",
+        )
+
+    update_user_free_sparql_judging_quota(current_user)
+
+    config = ConfigManager()
+    config.set_configuration(active_configuration.model_dump())
+
+    return StreamingResponse(
+        refine_query(
+            config=config,
+            model_config_id=refine_query_request.model_config_id,
+            question=refine_query_request.question,
+            sparql_query=refine_query_request.sparql_query,
+            sparql_query_context=refine_query_request.sparql_query_context,
+        ),
+        media_type="application/json",
+    )
+
+
+@app.post(
+    path="/api/q2forge/token",
+    response_model=Token,
+    operation_id="generate_access_token",
+    summary="Generate an access token",
+    description="This endpoint verifies the submitted credentials and generates an access token",
+    responses={
+        200: {
+            "description": "The generated access token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "access_token": "<access_token>",
+                        "token_type": "bearer",
+                        "expires_in": 30,
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Invalid credentials",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Incorrect username or password"}
+                }
+            },
+        },
+    },
+)
+async def generate_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES,
+    }
+
+
+@app.get(
+    path="/api/q2forge/me",
+    response_model=UserResponse,
+    operation_id="get_current_user_info",
+    summary="Get current user information",
+    description="This endpoint returns the current user's username, active configuration",
+    responses={
+        200: {
+            "description": "The current user's information",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "username": "<username>",
+                        "disabled": False,
+                        "active_config_id": 1,
+                        "sparql_chats": [],
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Unauthorized",
+            "content": {
+                "application/json": {"example": {"detail": "Not authenticated"}}
+            },
+        },
+    },
+)
+async def read_user_data(current_user: UserResponse = Depends(get_current_active_user)):
+    return current_user
+
+
+@app.post(
+    path="/api/q2forge/sign-up",
+    response_model=Token,
+    operation_id="register_user",
+    summary="Register a new user",
+    description="This endpoint registers a new user and generates an access token for them",
+    responses={
+        201: {
+            "description": "The generated access token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "access_token": "<access_token>",
+                        "token_type": "bearer",
+                        "expires_in": 30,
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "User already exists",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Username already registered"}
+                }
+            },
+        },
+    },
+)
+async def register_user(new_user: UserSignUp):
+
+    access_token = create_new_user(new_user=new_user)
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES,
+    }
+
+
+@app.post(
+    path="/api/q2forge/user/sparql_chats",
+    operation_id="add_sparql_chat",
+    summary="Add a SPARQL chat to the user's chats history",
+    description=("This endpoint adds a SPARQL chat to the user's chats history."),
+    responses={
+        200: {
+            "description": "The updated SPARQL chat history of the user",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "created_at": "2025-10-01T12:00:00Z",
+                        "messages": [
+                            {
+                                "sender": "user",
+                                "content": "What wheat varieties are associated with the phenotype 'drought tolerance'?",
+                                "eventType": "user_message",
+                            },
+                            {
+                                "sender": "init",
+                                "content": "**Using the scenario:** scenario_1.",
+                                "eventType": "on_chain_end",
+                            },
+                        ],
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "An error occurred while updating the chat history",
+            "content": {
+                "application/json": {
+                    "example": {"error": "Failed to update chat history>"}
+                }
+            },
+        },
+    },
+)
+def save_sparql_chat_endpoint(
+    chat_request: SparqlGenerationChat,
+    current_user: UserResponse = Depends(get_current_active_user),
+) -> SparqlGenerationChat:
+    try:
+
+        logger.debug(f"Received chat: {chat_request}")
+
+        response = update_user_chat_history(current_user, chat_request)
+
+        if not response:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update chat history",
+            )
+
+        logger.info(f"SPARQL chat history updated of user {current_user.username}")
+
+        return response
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+
+
+@app.delete(
+    path="/api/q2forge/user/sparql_chats",
+    operation_id="delete_sparql_chat",
+    summary="Delete a SPARQL chat from the user's chats history",
+    description=("This endpoint deletes a SPARQL chat from the user's chats history."),
+    responses={
+        200: {
+            "description": "The deleted chat",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "created_at": "2025-10-01T12:00:00Z",
+                        "messages": [
+                            {
+                                "sender": "user",
+                                "content": "What wheat varieties are associated with the phenotype 'drought tolerance'?",
+                                "eventType": "user_message",
+                            },
+                            {
+                                "sender": "init",
+                                "content": "**Using the scenario:** scenario_1.",
+                                "eventType": "on_chain_end",
+                            },
+                        ],
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "An error occurred while deleting the chat",
+            "content": {
+                "application/json": {"example": {"error": "Failed to delete a chat>"}}
+            },
+        },
+    },
+)
+def delete_sparql_chat_endpoint(
+    chat_request: SparqlGenerationChat,
+    current_user: UserResponse = Depends(get_current_active_user),
+) -> SparqlGenerationChat:
+    try:
+
+        logger.debug(f"Received chat: {chat_request}")
+
+        response = delete_user_chat_from_history(current_user, chat_request)
+
+        if not response:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to delete a chat",
+            )
+
+        logger.info(f"SPARQL chat history deleted for user {current_user.username}")
+
+        return response
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+
+
+# Add MCP server to FastAPI app
+mcp = FastApiMCP(fastapi=app, name="Gen²KGBot", auth_config=AuthConfig(
+    dependencies=[Depends(get_current_user)]
+))
+
+# Mount the MCP server directly to your FastAPI app
+mcp.mount_sse()
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="localhost", port=8000)

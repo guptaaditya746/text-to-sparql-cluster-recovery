@@ -1,0 +1,11 @@
+# Find conference papers published in 2024.
+
+PREFIX dblp: <https://dblp.org/rdf/schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT ?publication ?title WHERE {
+  ?publication a dblp:Inproceedings ;
+               dblp:title ?title ;
+               dblp:yearOfPublication "2024"^^xsd:gYear .
+}
+LIMIT 20

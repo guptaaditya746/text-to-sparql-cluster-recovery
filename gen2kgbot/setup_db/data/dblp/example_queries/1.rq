@@ -1,0 +1,10 @@
+# Find publications by Michael Ley.
+
+PREFIX dblp: <https://dblp.org/rdf/schema#>
+
+SELECT ?publication ?title WHERE {
+  ?person dblp:primaryCreatorName "Michael Ley" .
+  ?publication dblp:authoredBy ?person ;
+               dblp:title ?title .
+}
+LIMIT 20
