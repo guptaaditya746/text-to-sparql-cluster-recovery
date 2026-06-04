@@ -1,0 +1,38 @@
+# Local environment files
+.env
+**/.env
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.venv/
+**/venv/
+
+# gen2kgbot runtime artifacts
+gen2kgbot/.langgraph_api/
+gen2kgbot/tmp/
+gen2kgbot/logs/
+gen2kgbot/data/*
+!gen2kgbot/data/idsm_queries/
+gen2kgbot/app/notebooks/evaluation/
+
+# q2forge build artifacts
+q2forge/node_modules/
+q2forge/dist/
+q2forge/.angular/
+q2forge/coverage/
+q2forge/tmp/
+q2forge/out-tsc/
+q2forge/bazel-out/
+q2forge/.sass-cache/
+q2forge/.history/
+q2forge/testing-*
+
+# Editor and OS files
+.vscode/
+**/.idea/
+**/.DS_Store
+**/Thumbs.db
