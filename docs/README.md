@@ -56,6 +56,17 @@ Read this if you are assessing the system and need to:
 - interpret the available evaluation metrics
 - reproduce or adapt LangSmith and Langfuse evaluation scripts
 
+### 5. Pre-Deployment Precheck Test Cases
+
+File: [pre-deployment-precheck-test-cases.md](./pre-deployment-precheck-test-cases.md)
+
+Read this if you need a deployment gate for:
+
+- environment and compose setup
+- backend API accessibility
+- Ollama reachability and model readiness
+- a repeatable host-side precheck before rollout
+
 ## Suggested reading order
 
 If you are new to the repo:
@@ -64,6 +75,7 @@ If you are new to the repo:
 2. Read [developer-guide.md](./developer-guide.md) to understand the implementation.
 3. Read [deployment-and-operations-guide.md](./deployment-and-operations-guide.md) if you will run the stack.
 4. Read [evaluator-guide.md](./evaluator-guide.md) if you need to assess correctness, quality, or reproducibility.
+5. Read [pre-deployment-precheck-test-cases.md](./pre-deployment-precheck-test-cases.md) if you need a release gate before deployment.
 
 ## Existing project-specific source docs
 

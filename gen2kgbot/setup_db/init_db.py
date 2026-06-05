@@ -1,4 +1,9 @@
 from app.utils.database_manager import close_db, db
+from app.utils.quota_defaults import (
+    get_initial_free_cq_generation,
+    get_initial_free_sparql_query_answers,
+    get_initial_free_sparql_query_judging,
+)
 from bson import ObjectId
 import shutil
 
@@ -13,9 +18,9 @@ collections = [
                 "hashed_password": "$2b$12$yZMqaDhT.nlaAtYe4m0qFeQF1bM5fRMJ5A8viek5Z7Z6maXFH/r7i",
                 "active_config_id": ObjectId("686668b8b3daabccac9fce03"),
                 "sparql_chats": [],
-                "free_cq_generation_left": 1000,
-                "free_sparql_query_answers_left": 1000,
-                "free_sparql_query_judging_left": 1000,
+                "free_cq_generation_left": get_initial_free_cq_generation(),
+                "free_sparql_query_answers_left": get_initial_free_sparql_query_answers(),
+                "free_sparql_query_judging_left": get_initial_free_sparql_query_judging(),
             }
         ],
     },

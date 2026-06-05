@@ -7,15 +7,20 @@ from app.api.database.user import add_user, get_user
 from app.api.models.token import TokenData
 from app.api.models.user import UserInDB, UserSignUp
 from app.utils.envkey_manager import get_q2forge_database_key
+from app.utils.quota_defaults import (
+    get_initial_free_cq_generation,
+    get_initial_free_sparql_query_answers,
+    get_initial_free_sparql_query_judging,
+)
 
 
 SECRET_KEY = get_q2forge_database_key()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 10080  # 7 days in minutes
 
-INITIAL_FREE_CQ_GENERATION = 1000
-INITIAL_FREE_SPARQL_QUERY_ANSWERS = 1000
-INITIAL_FREE_SPARQL_QUERY_JUDGING = 1000
+INITIAL_FREE_CQ_GENERATION = get_initial_free_cq_generation()
+INITIAL_FREE_SPARQL_QUERY_ANSWERS = get_initial_free_sparql_query_answers()
+INITIAL_FREE_SPARQL_QUERY_JUDGING = get_initial_free_sparql_query_judging()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth_2_scheme = OAuth2PasswordBearer(tokenUrl="token")
