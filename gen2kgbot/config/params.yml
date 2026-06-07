@@ -66,9 +66,9 @@ data_directory: "./data"
 # These names must be consistent with the chosen embedding model names in section text_embedding_models
 # Parent diectory will be {data_directory}/{graph short name}/{vector_db}_embeddings/ 
 # e.g. ./data/idsm/faiss_embeddings/
-class_embeddings_subdir: "classes_with_instance_nomic"
-property_embeddings_subdir: "properties_nomic"
-queries_embeddings_subdir: "sparql_queries_nomic"
+class_embeddings_subdir: "classes_with_instance_qwen"
+property_embeddings_subdir: "properties_qwen"
+queries_embeddings_subdir: "sparql_queries_qwen"
 
 # Path to a usable temporary directory
 temp_directory: "./tmp"
@@ -181,6 +181,14 @@ seq2seq_models:
     server_type: openai
     id: o1
 
+  qwen-chat@remote:
+    server_type: openai
+    id: qwen-chat
+    base_url: http://gammaweb07.medien.uni-weimar.de:8000/v1
+    temperature: 0
+    max_retries: 3
+    top_p: 0.95
+
   # DeepSeek models
 
   deepseek-chat@deepseek:
@@ -228,42 +236,48 @@ text_embedding_models:
     server_type: ollama-embeddings
     id: nomic-embed-text
     vector_db: chroma
+
+  qwen-embed_faiss@remote:
+    server_type: openai-embeddings
+    id: qwen-embed
+    base_url: http://gammaweb07.medien.uni-weimar.de:8001/v1
+    vector_db: faiss
   
 # -----------------------------------------------------------
 # Scenarios
       
 scenario_1:
-  validate_question: gemma-3_4b@local
-  ask_question: gemma-3_4b@local
+  validate_question: qwen-chat@remote
+  ask_question: qwen-chat@remote
     
 scenario_2:
-  validate_question: gemma-3_4b@local
-  generate_query: gemma-3_4b@local
-  interpret_results: gemma-3_4b@local
+  validate_question: qwen-chat@remote
+  generate_query: qwen-chat@remote
+  interpret_results: qwen-chat@remote
 
 scenario_3:
-  validate_question: gemma-3_4b@local
-  generate_query: gemma-3_4b@local
-  interpret_results: gemma-3_4b@local
-  text_embedding_model: nomic-embed-text_faiss@local
+  validate_question: qwen-chat@remote
+  generate_query: qwen-chat@remote
+  interpret_results: qwen-chat@remote
+  text_embedding_model: qwen-embed_faiss@remote
 
 scenario_4:
-  validate_question: gemma-3_4b@local
-  generate_query: gemma-3_4b@local
-  interpret_results: gemma-3_4b@local
-  text_embedding_model: nomic-embed-text_faiss@local
+  validate_question: qwen-chat@remote
+  generate_query: qwen-chat@remote
+  interpret_results: qwen-chat@remote
+  text_embedding_model: qwen-embed_faiss@remote
 
 scenario_5:
-  validate_question: gemma-3_4b@local
-  generate_query: gemma-3_4b@local
-  interpret_results: gemma-3_4b@local
-  text_embedding_model: nomic-embed-text_faiss@local
+  validate_question: qwen-chat@remote
+  generate_query: qwen-chat@remote
+  interpret_results: qwen-chat@remote
+  text_embedding_model: qwen-embed_faiss@remote
 
 scenario_6:
-  validate_question: gemma-3_4b@local
-  generate_query: gemma-3_4b@local
-  interpret_results: gemma-3_4b@local
-  text_embedding_model: nomic-embed-text_faiss@local
+  validate_question: qwen-chat@remote
+  generate_query: qwen-chat@remote
+  interpret_results: qwen-chat@remote
+  text_embedding_model: qwen-embed_faiss@remote
 
 scenario_7:
   generate_query: llama-3_1-70B@ovh

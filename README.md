@@ -196,13 +196,34 @@ OPENAI_BASE_URL=http://127.0.0.1:11434/v1
 
 The backend can also use remote OpenAI-compatible chat and embedding servers, including vLLM-style `/v1` endpoints.
 
-Set the API key in your shell or `.env`:
+For the Weimar gammaweb vLLM services, chat and embeddings are exposed on different ports:
+
+- chat completions: `http://gammaweb07.medien.uni-weimar.de:8000/v1`
+- embeddings: `http://gammaweb07.medien.uni-weimar.de:8001/v1`
+
+First verify both OpenAI-compatible endpoints directly:
+
+```bash
+curl http://gammaweb07.medien.uni-weimar.de:8001/v1/embeddings \
+  -H 'Authorization: Bearer sk-local-vllm' \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"qwen-embed","input":"GraphRAG query to knowledge graph retrieval"}'
+```
+
+```bash
+curl http://gammaweb07.medien.uni-weimar.de:8000/v1/chat/completions \
+  -H 'Authorization: Bearer sk-local-vllm' \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"qwen-chat","messages":[{"role":"user","content":"Say hello in one sentence."}],"max_tokens":64}'
+```
+
+Then set the shared bearer token in your shell or `.env`:
 
 ```env
 OPENAI_API_KEY=sk-local-vllm
 ```
 
-Then define the remote models in your KG config file, for example `gen2kgbot/config/params.yml` or a copied variant:
+Because these services use separate ports, define `base_url` per model in your KG config file, for example `gen2kgbot/config/params.yml` or a copied variant:
 
 ```yaml
 seq2seq_models:
