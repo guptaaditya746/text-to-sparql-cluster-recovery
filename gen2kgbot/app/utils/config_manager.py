@@ -349,27 +349,23 @@ class ConfigManager:
             max_tokens = None
 
         if server_type == "openai":
+            base_url = llm_config.get("base_url") or os.getenv("OPENAI_BASE_URL")
+            openai_kwargs = {
+                "temperature": temperature,
+                "model": model_id,
+                "max_retries": max_retries,
+                "verbose": True,
+                "openai_api_key": get_openai_key(),
+                "model_kwargs": model_kwargs,
+                "max_tokens": max_tokens,
+            }
+            if base_url:
+                openai_kwargs["base_url"] = base_url
+
             if model_id.startswith("o"):  # o1/o3 do not support parameter top_p
-                llm_config = ChatOpenAI(
-                    temperature=temperature,
-                    model=model_id,
-                    max_retries=max_retries,
-                    verbose=True,
-                    openai_api_key=get_openai_key(),
-                    model_kwargs=model_kwargs,
-                    max_tokens=max_tokens,
-                )
+                llm_config = ChatOpenAI(**openai_kwargs)
             else:
-                llm_config = ChatOpenAI(
-                    temperature=temperature,
-                    model=model_id,
-                    max_retries=max_retries,
-                    verbose=True,
-                    openai_api_key=get_openai_key(),
-                    model_kwargs=model_kwargs,
-                    top_p=top_p,
-                    max_tokens=max_tokens,
-                )
+                llm_config = ChatOpenAI(top_p=top_p, **openai_kwargs)
 
         elif server_type == "ollama":
             base_url = llm_config.get("base_url") or os.getenv("OLLAMA_HOST")
@@ -472,13 +468,20 @@ class ConfigManager:
         embed_config = self.get_embedding_model_config_by_name(embed_name)
         server_type = embed_config["server_type"]
         model_id = embed_config["id"]
-        base_url = embed_config.get("base_url") or os.getenv("OLLAMA_HOST")
+        ollama_base_url = embed_config.get("base_url") or os.getenv("OLLAMA_HOST")
+        openai_base_url = embed_config.get("base_url") or os.getenv("OPENAI_BASE_URL")
 
         if server_type == "ollama-embeddings":
-            embeddings = OllamaEmbeddings(model=model_id, base_url=base_url)
+            embeddings = OllamaEmbeddings(model=model_id, base_url=ollama_base_url)
 
         elif server_type == "openai-embeddings":
-            embeddings = OpenAIEmbeddings(model=model_id)
+            embedding_kwargs = {
+                "model": model_id,
+                "api_key": get_openai_key(),
+            }
+            if openai_base_url:
+                embedding_kwargs["base_url"] = openai_base_url
+            embeddings = OpenAIEmbeddings(**embedding_kwargs)
 
         else:
             logger.error(f"Unsupported type of embedding model: {server_type}")
