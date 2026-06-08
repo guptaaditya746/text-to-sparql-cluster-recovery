@@ -5,6 +5,7 @@ from app.utils.quota_defaults import (
     get_initial_free_sparql_query_judging,
 )
 from bson import ObjectId
+from pathlib import Path
 import shutil
 
 collections = [
@@ -294,10 +295,20 @@ def initialize_database():
 
 
 def copy_default_embeddings():
-    source_folder = "setup_db/data"
-    destination_folder = "data"
+    source_folder = Path("setup_db/data")
+    destination_folder = Path("data")
 
-    # This copies everything from source to destination
+    # In some shared or symlinked setups, data/ already resolves to setup_db/data.
+    # Copying a directory onto itself raises shutil.Error for "same file".
+    try:
+        if source_folder.resolve() == destination_folder.resolve():
+            print(
+                f"ℹ️ Skipping default embeddings copy because '{destination_folder}' already points to '{source_folder}'."
+            )
+            return
+    except FileNotFoundError:
+        pass
+
     shutil.copytree(source_folder, destination_folder, dirs_exist_ok=True)
 
 
