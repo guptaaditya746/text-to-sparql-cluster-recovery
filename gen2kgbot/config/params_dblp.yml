@@ -162,68 +162,63 @@ class_context_format: turtle
 # LLM configurations
 
 seq2seq_models:
-  qwen2_5-coder-7b@local:
-    server_type: ollama
-    id: qwen2.5-coder:7b-instruct
+  qwen-chat@remote:
+    server_type: openai
+    id: qwen-chat
+    base_url: http://gammaweb07.medien.uni-weimar.de:8000/v1
     temperature: 0
     max_retries: 3
-    top_p: 0.9
-
-  qwen2_5-coder-14b@local:
-    server_type: ollama
-    id: qwen2.5-coder:14b-instruct
-    temperature: 0
-    max_retries: 3
-    top_p: 0.9
+    top_p: 0.95
 
 text_embedding_models:
-  nomic-embed-text_faiss@local:
-    server_type: ollama-embeddings
-    id: nomic-embed-text
+  qwen-embed_faiss@remote:
+    server_type: openai-embeddings
+    id: qwen-embed
+    base_url: http://gammaweb07.medien.uni-weimar.de:8001/v1
     vector_db: faiss
 
 # -----------------------------------------------------------
 # Scenarios
 
 scenario_1:
-  validate_question: qwen2_5-coder-7b@local
-  ask_question: qwen2_5-coder-7b@local
+  validate_question: qwen-chat@remote
+  ask_question: qwen-chat@remote
 
 scenario_2:
-  validate_question: qwen2_5-coder-7b@local
-  generate_query: qwen2_5-coder-7b@local
-  interpret_results: qwen2_5-coder-7b@local
+  validate_question: qwen-chat@remote
+  generate_query: qwen-chat@remote
+  interpret_results: qwen-chat@remote
 
 scenario_3:
-  validate_question: qwen2_5-coder-7b@local
-  generate_query: qwen2_5-coder-7b@local
-  interpret_results: qwen2_5-coder-7b@local
-  text_embedding_model: nomic-embed-text_faiss@local
+  validate_question: qwen-chat@remote
+  generate_query: qwen-chat@remote
+  interpret_results: qwen-chat@remote
+  text_embedding_model: qwen-embed_faiss@remote
 
 scenario_4:
-  validate_question: qwen2_5-coder-7b@local
-  generate_query: qwen2_5-coder-7b@local
-  interpret_results: qwen2_5-coder-7b@local
-  text_embedding_model: nomic-embed-text_faiss@local
+  validate_question: qwen-chat@remote
+  generate_query: qwen-chat@remote
+  interpret_results: qwen-chat@remote
+  text_embedding_model: qwen-embed_faiss@remote
 
 scenario_5:
-  validate_question: qwen2_5-coder-7b@local
-  generate_query: qwen2_5-coder-7b@local
-  interpret_results: qwen2_5-coder-7b@local
-  text_embedding_model: nomic-embed-text_faiss@local
+  validate_question: qwen-chat@remote
+  generate_query: qwen-chat@remote
+  interpret_results: qwen-chat@remote
+  text_embedding_model: qwen-embed_faiss@remote
 
 scenario_6:
-  validate_question: qwen2_5-coder-7b@local
-  generate_query: qwen2_5-coder-7b@local
-  interpret_results: qwen2_5-coder-7b@local
-  text_embedding_model: nomic-embed-text_faiss@local
+  validate_question: qwen-chat@remote
+  generate_query: qwen-chat@remote
+  interpret_results: qwen-chat@remote
+  text_embedding_model: qwen-embed_faiss@remote
 
 scenario_7:
-  validate_question: qwen2_5-coder-7b@local
-  generate_query: qwen2_5-coder-7b@local
-  judge_query: qwen2_5-coder-14b@local
-  judge_regenerate_query: qwen2_5-coder-7b@local
-  interpret_results: qwen2_5-coder-7b@local
-  text_embedding_model: nomic-embed-text_faiss@local
+  validate_question: qwen-chat@remote
+  generate_query: qwen-chat@remote
+  judge_query: qwen-chat@remote
+  judge_regenerate_query: qwen-chat@remote
+  interpret_results: qwen-chat@remote
+  text_embedding_model: qwen-embed_faiss@remote
   judging_grade_threshold_retry: 8
   judging_grade_threshold_run: 6
