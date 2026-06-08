@@ -48,7 +48,6 @@ from app.preprocessing.gen_descriptions import GenDescriptions
 from app.utils.config_manager import ConfigManager
 from app.utils.construct_util import ConstructUtil
 from app.utils.logger_manager import setup_logger
-from app.preprocessing.compute_embeddings import ComputeEmbeddings
 import uvicorn
 from fastapi.openapi.docs import get_redoc_html
 
@@ -756,6 +755,8 @@ def generate_kg_embeddings_endpoint(
     active_configuration: KGConfig = Depends(get_active_config_endpoint),
 ):
     try:
+        from app.preprocessing.compute_embeddings import ComputeEmbeddings
+
         config = ConfigManager()
         config.set_configuration(active_configuration.model_dump())
         compute_embeddings = ComputeEmbeddings(config=config)
