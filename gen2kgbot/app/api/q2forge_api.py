@@ -44,7 +44,6 @@ from app.api.services.generate_competency_question import generate_competency_qu
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.services.graph_mermaid import get_scenarios_schema
 from app.api.services.refine_query import refine_query
-from app.preprocessing.gen_descriptions import GenDescriptions
 from app.utils.config_manager import ConfigManager
 from app.utils.construct_util import ConstructUtil
 from app.utils.logger_manager import setup_logger
@@ -693,6 +692,8 @@ def generate_kg_descriptions_endpoint(
     active_configuration: KGConfig = Depends(get_active_config_endpoint),
 ):
     try:
+        from app.preprocessing.gen_descriptions import GenDescriptions
+
         config = ConfigManager()
         config.set_configuration(active_configuration.model_dump())
         constructUtil = ConstructUtil(config)
