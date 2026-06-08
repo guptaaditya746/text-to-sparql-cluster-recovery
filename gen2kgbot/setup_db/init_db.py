@@ -7,6 +7,7 @@ from app.utils.quota_defaults import (
 from bson import ObjectId
 from pathlib import Path
 import shutil
+import yaml
 
 collections = [
     {
@@ -290,8 +291,35 @@ def initialize_database():
         else:
             print(f"⚠️ Collection '{name}' already has data. Skipping initial insert.")
 
-    close_db()
-    print("🔌 MongoDB connection closed")
+def upsert_configuration_from_file(config_path: Path):
+    with config_path.open("r", encoding="utf-8") as config_file:
+        config = yaml.safe_load(config_file) or {}
+
+    kg_short_name = config.get("kg_short_name")
+    if not kg_short_name:
+        print(f"ℹ️ Skipping config import with no kg_short_name: {config_path.name}")
+        return
+
+    existing = db["configurations"].find_one({"kg_short_name": kg_short_name}, {"_id": 1})
+    if existing:
+        config["_id"] = existing["_id"]
+        action = "updated"
+    else:
+        config["_id"] = ObjectId()
+        action = "inserted"
+
+    db["configurations"].replace_one({"kg_short_name": kg_short_name}, config, upsert=True)
+    print(f"✅ {action.capitalize()} configuration from file: {config_path.name}")
+
+
+def sync_file_backed_configurations():
+    config_dir = Path(__file__).resolve().parent.parent / "config"
+    for config_name in ("params_dblp.yml",):
+        config_path = config_dir / config_name
+        if config_path.exists():
+            upsert_configuration_from_file(config_path)
+        else:
+            print(f"ℹ️ Configuration file not found, skipping: {config_name}")
 
 
 def copy_default_embeddings():
@@ -315,3 +343,6 @@ def copy_default_embeddings():
 if __name__ == "__main__":
     copy_default_embeddings()
     initialize_database()
+    sync_file_backed_configurations()
+    close_db()
+    print("🔌 MongoDB connection closed")

@@ -6,10 +6,26 @@ kg_short_name: dblp
 
 # KG textual description (used in prompts)
 kg_description: >
-  The DBLP Knowledge Graph describes the computer science bibliography. It includes
-  scholarly publications, authors and editors, publication venues such as journals
-  and conferences, publication years, identifiers, citations, and relationships
-  between creators and scholarly works.
+  The DBLP Knowledge Graph is the RDF representation of the dblp computer science
+  bibliography. It models scholarly publications, creators, publication venues
+  called streams, signatures linking publications to authors or editors, external
+  identifiers, and bibliographic metadata such as titles, years, pages, volumes,
+  DOIs, ORCIDs, ISBNs, ISSNs, Wikidata IDs, and OpenCitations Meta Identifiers
+  (OMIDs). Use dblp:Publication and its subtypes for papers and books, dblp:Creator
+  and its subtypes for authors and editors, dblp:Stream and its subtypes for
+  journals, conference/workshop series, repositories, and book series. Prefer
+  direct predicates such as dblp:authoredBy, dblp:authorOf, dblp:publishedInStream,
+  dblp:yearOfPublication, and dblp:title for common bibliography questions.
+  Use dblp:hasSignature with dblp:signatureCreator, dblp:signatureDblpName,
+  dblp:signatureOrdinal, and dblp:signatureOrcid when author order, role, or
+  publication-specific creator metadata matters. Venue lookup should prefer
+  dblp:publishedInStream and stream titles, while legacy literal venue names may
+  use dblp:publishedIn, dblp:publishedInJournal, or dblp:publishedInSeries.
+  Citation-style queries are supported through OpenCitations data in the public
+  endpoint by joining DBLP publications through dblp:omid to CiTO citation
+  entities, especially cito:hasCitedEntity and cito:hasCitingEntity. Affiliation
+  values exist as literals on creators via dblp:affiliation and
+  dblp:primaryAffiliation; they are not modeled as institution entities.
 
 # SPARQL endpoint serving the KG
 kg_sparql_endpoint_url: "https://sparql.dblp.org/sparql"
@@ -24,12 +40,17 @@ prefixes:
   rdfs: "http://www.w3.org/2000/01/rdf-schema#"
   xsd: "http://www.w3.org/2001/XMLSchema#"
   owl: "http://www.w3.org/2002/07/owl#"
+  datacite: "http://purl.org/spar/datacite/"
+  litre: "http://purl.org/spar/literal/"
+  cito: "http://purl.org/spar/cito/"
+  bibtex: "http://purl.org/net/nknouf/ns/bibtex#"
+  bibo: "http://purl.org/ontology/bibo/"
   dct: "http://purl.org/dc/terms/"
   dc: "http://purl.org/dc/elements/1.1/"
   foaf: "http://xmlns.com/foaf/0.1/"
   schema: "https://schema.org/"
-  bibo: "http://purl.org/ontology/bibo/"
-  cito: "http://purl.org/spar/cito/"
+  wd: "http://www.wikidata.org/entity/"
+  wdt: "http://www.wikidata.org/prop/direct/"
 
 # DBLP exposes its schema in the default graph of the public endpoint.
 ontology_named_graphs: []
@@ -39,17 +60,87 @@ properties_qnames_info:
   - rdfs:label
   - rdfs:comment
   - dblp:title
-  - dblp:primaryCreatorName
+  - dblp:bibtexType
+  - dblp:yearOfPublication
+  - dblp:yearOfEvent
+  - dblp:monthOfPublication
+  - dblp:numberOfCreators
+  - dblp:pagination
+  - dblp:publicationNote
+  - dblp:createdBy
+  - dblp:creatorOf
+  - dblp:authoredBy
+  - dblp:authorOf
+  - dblp:editedBy
+  - dblp:editorOf
+  - dblp:coCreatorWith
+  - dblp:coAuthorWith
+  - dblp:coEditorWith
   - dblp:creatorName
+  - dblp:primaryCreatorName
+  - dblp:hasSignature
+  - dblp:signaturePublication
+  - dblp:signatureCreator
+  - dblp:signatureDblpName
+  - dblp:signatureOrdinal
+  - dblp:signatureOrcid
+  - dblp:publishedInStream
+  - dblp:publishedIn
+  - dblp:publishedInJournal
+  - dblp:publishedInJournalVolume
+  - dblp:publishedInSeries
+  - dblp:publishedInSeriesVolume
+  - dblp:publishedAsPartOf
   - dblp:primaryStreamTitle
   - dblp:streamTitle
-  - dblp:yearOfPublication
+  - dblp:formerStreamTitle
+  - dblp:relatedStream
+  - dblp:subStream
+  - dblp:superStream
+  - dblp:predecessorStream
+  - dblp:successorStream
+  - dblp:indexPage
+  - dblp:iso4
+  - dblp:identifier
   - dblp:doi
   - dblp:orcid
+  - dblp:omid
+  - dblp:isbn
+  - dblp:issn
+  - dblp:wikidata
+  - dblp:wikipedia
+  - dblp:webpage
+  - dblp:homepage
+  - dblp:primaryHomepage
+  - dblp:documentPage
+  - dblp:primaryDocumentPage
+  - datacite:hasIdentifier
+  - datacite:usesIdentifierScheme
+  - litre:hasLiteralValue
+  - schema:url
   - dblp:affiliation
+  - dblp:primaryAffiliation
+  - cito:hasCitedEntity
+  - cito:hasCitingEntity
 
 # Optional list of classes and namespaces to exclude from similar-class retrieval
-excluded_classes_namespaces: []
+excluded_classes_namespaces:
+  - "http://www.wikidata.org/entity/"
+  - "http://www.wikidata.org/prop/direct/"
+  - "https://schema.org/"
+  - "http://dbpedia.org/ontology/"
+  - "http://xmlns.com/foaf/0.1/"
+  - "http://purl.org/ontology/bibo/"
+  - "http://purl.org/net/nknouf/ns/bibtex#"
+  - "http://id.loc.gov/ontologies/bibframe/"
+  - "http://id.loc.gov/vocabulary/identifiers/"
+  - "http://id.loc.gov/vocabulary/relators/"
+  - "http://purl.org/dc/terms/"
+  - "http://purl.org/dc/elements/1.1/"
+  - "http://www.w3.org/2002/07/owl#"
+  - "http://www.w3.org/2000/01/rdf-schema#"
+  - "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  - "http://www.w3.org/2001/XMLSchema#"
 
 # Root path for classes context and pre-computed embeddings
 data_directory: "./data"
@@ -63,20 +154,27 @@ queries_embeddings_subdir: "sparql_queries_nomic"
 temp_directory: "./tmp"
 
 # Retrieval options
-max_similar_classes: 10
-expand_similar_classes: false
+max_similar_classes: 14
+expand_similar_classes: true
 class_context_format: turtle
 
 # -----------------------------------------------------------
 # LLM configurations
 
 seq2seq_models:
-  llama3_2-1b@local:
+  qwen2_5-coder-7b@local:
     server_type: ollama
-    id: llama3.2:1b
+    id: qwen2.5-coder:7b-instruct
     temperature: 0
     max_retries: 3
-    top_p: 0.95
+    top_p: 0.9
+
+  qwen2_5-coder-14b@local:
+    server_type: ollama
+    id: qwen2.5-coder:14b-instruct
+    temperature: 0
+    max_retries: 3
+    top_p: 0.9
 
 text_embedding_models:
   nomic-embed-text_faiss@local:
@@ -88,44 +186,44 @@ text_embedding_models:
 # Scenarios
 
 scenario_1:
-  validate_question: llama3_2-1b@local
-  ask_question: llama3_2-1b@local
+  validate_question: qwen2_5-coder-7b@local
+  ask_question: qwen2_5-coder-7b@local
 
 scenario_2:
-  validate_question: llama3_2-1b@local
-  generate_query: llama3_2-1b@local
-  interpret_results: llama3_2-1b@local
+  validate_question: qwen2_5-coder-7b@local
+  generate_query: qwen2_5-coder-7b@local
+  interpret_results: qwen2_5-coder-7b@local
 
 scenario_3:
-  validate_question: llama3_2-1b@local
-  generate_query: llama3_2-1b@local
-  interpret_results: llama3_2-1b@local
+  validate_question: qwen2_5-coder-7b@local
+  generate_query: qwen2_5-coder-7b@local
+  interpret_results: qwen2_5-coder-7b@local
   text_embedding_model: nomic-embed-text_faiss@local
 
 scenario_4:
-  validate_question: llama3_2-1b@local
-  generate_query: llama3_2-1b@local
-  interpret_results: llama3_2-1b@local
+  validate_question: qwen2_5-coder-7b@local
+  generate_query: qwen2_5-coder-7b@local
+  interpret_results: qwen2_5-coder-7b@local
   text_embedding_model: nomic-embed-text_faiss@local
 
 scenario_5:
-  validate_question: llama3_2-1b@local
-  generate_query: llama3_2-1b@local
-  interpret_results: llama3_2-1b@local
+  validate_question: qwen2_5-coder-7b@local
+  generate_query: qwen2_5-coder-7b@local
+  interpret_results: qwen2_5-coder-7b@local
   text_embedding_model: nomic-embed-text_faiss@local
 
 scenario_6:
-  validate_question: llama3_2-1b@local
-  generate_query: llama3_2-1b@local
-  interpret_results: llama3_2-1b@local
+  validate_question: qwen2_5-coder-7b@local
+  generate_query: qwen2_5-coder-7b@local
+  interpret_results: qwen2_5-coder-7b@local
   text_embedding_model: nomic-embed-text_faiss@local
 
 scenario_7:
-  validate_question: llama3_2-1b@local
-  generate_query: llama3_2-1b@local
-  judge_query: llama3_2-1b@local
-  judge_regenerate_query: llama3_2-1b@local
-  interpret_results: llama3_2-1b@local
+  validate_question: qwen2_5-coder-7b@local
+  generate_query: qwen2_5-coder-7b@local
+  judge_query: qwen2_5-coder-14b@local
+  judge_regenerate_query: qwen2_5-coder-7b@local
+  interpret_results: qwen2_5-coder-7b@local
   text_embedding_model: nomic-embed-text_faiss@local
   judging_grade_threshold_retry: 8
-  judging_grade_threshold_run: 5
+  judging_grade_threshold_run: 6
