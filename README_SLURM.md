@@ -6,8 +6,8 @@ The instructions assume:
 
 - repository path on the cluster: `~/thesis/text-to-sparql`
 - backend Conda/Micromamba environment name: `gen2kgbot`
-- remote chat endpoint: `http://gammaweb07.medien.uni-weimar.de:8000/v1`
-- remote embedding endpoint: `http://gammaweb07.medien.uni-weimar.de:8001/v1`
+- remote chat endpoint: `http://gammaweb05.medien.uni-weimar.de:8000/v1`
+- remote embedding endpoint: `http://gammaweb05.medien.uni-weimar.de:8001/v1`
 - reverse tunnel relay host: `ssh.webis.de`
 
 ## Architecture
@@ -22,8 +22,8 @@ During the demo, the system is split across three layers:
 
 2. Shared remote model host
    Runs:
-   - `qwen-chat` on `gammaweb07.medien.uni-weimar.de:8000`
-   - `qwen-embed` on `gammaweb07.medien.uni-weimar.de:8001`
+   - `qwen-chat` on `gammaweb05.medien.uni-weimar.de:8000`
+   - `qwen-embed` on `gammaweb05.medien.uni-weimar.de:8001`
 
 3. Laptop
    Connects through:
@@ -170,14 +170,14 @@ echo "$OPENAI_API_KEY"
 Before starting the backend, verify both remote services directly from the GPU node:
 
 ```bash
-curl http://gammaweb07.medien.uni-weimar.de:8000/v1/chat/completions \
+curl http://gammaweb05.medien.uni-weimar.de:8000/v1/chat/completions \
   -H 'Authorization: Bearer sk-local-vllm' \
   -H 'Content-Type: application/json' \
   -d '{"model":"qwen-chat","messages":[{"role":"user","content":"Say hello in one sentence."}],"max_tokens":64}'
 ```
 
 ```bash
-curl http://gammaweb07.medien.uni-weimar.de:8001/v1/embeddings \
+curl http://gammaweb05.medien.uni-weimar.de:8001/v1/embeddings \
   -H 'Authorization: Bearer sk-local-vllm' \
   -H 'Content-Type: application/json' \
   -d '{"model":"qwen-embed","input":"GraphRAG query to knowledge graph retrieval"}'

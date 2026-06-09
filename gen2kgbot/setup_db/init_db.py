@@ -173,7 +173,7 @@ collections = [
                     "qwen-chat@remote": {
                         "server_type": "openai",
                         "id": "qwen-chat",
-                        "base_url": "http://gammaweb07.medien.uni-weimar.de:8000/v1",
+                        "base_url": "http://gammaweb05.medien.uni-weimar.de:8000/v1",
                         "temperature": 0,
                         "max_retries": 3,
                         "top_p": 0.95,
@@ -220,7 +220,7 @@ collections = [
                     "qwen-embed_faiss@remote": {
                         "server_type": "openai-embeddings",
                         "id": "qwen-embed",
-                        "base_url": "http://gammaweb07.medien.uni-weimar.de:8001/v1",
+                        "base_url": "http://gammaweb05.medien.uni-weimar.de:8001/v1",
                         "vector_db": "faiss",
                     },
                 },
