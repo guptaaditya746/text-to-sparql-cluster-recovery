@@ -2,6 +2,8 @@
 
 This repository contains the Q2Forge frontend and the Gen2KGBot backend for text-to-SPARQL workflows.
 
+For running the stack on a SLURM GPU node with job-local MongoDB and SSH tunnels back to a laptop, see [README_SLURM.md](README_SLURM.md).
+
 ## Repository layout
 
 - `gen2kgbot/`: FastAPI backend, KG preprocessing, scenario logic
@@ -319,6 +321,7 @@ Make sure the shell that starts the backend has the same exported `.env` values 
 
 ## Additional docs
 
+- [README_SLURM.md](README_SLURM.md)
 - [docs/README.md](docs/README.md)
 - [docs/developer-guide.md](docs/developer-guide.md)
 - [docs/deployment-and-operations-guide.md](docs/deployment-and-operations-guide.md)

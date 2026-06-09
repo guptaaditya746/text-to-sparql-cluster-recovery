@@ -5,6 +5,8 @@ This repository contains two main applications:
 - `gen2kgbot/`: the Python backend that generates SPARQL, runs scenarios, exposes the API, and stores shared configuration data.
 - `q2forge/`: the Angular frontend that guides users through configuration, question generation, SPARQL generation, and query refinement.
 
+For cluster execution on a GPU node, also see [../README_SLURM.md](../README_SLURM.md).
+
 The documents below are intended to replace scattered onboarding knowledge with role-specific guides.
 
 ## Guides in this folder
