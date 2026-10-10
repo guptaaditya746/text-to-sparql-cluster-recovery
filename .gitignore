@@ -36,3 +36,7 @@ q2forge/testing-*
 **/.idea/
 **/.DS_Store
 **/Thumbs.db
+
+# Generated semantic search indexes and local model configs
+gen2kgbot/setup_db/data/**/faiss_embeddings/
+gen2kgbot/y/

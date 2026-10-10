@@ -1,4 +1,4 @@
-const SERVER = "http://localhost:8003";
+const SERVER = "http://127.0.0.1:8003";
 export const SPARQL_ENDPOINT_URI = `http://localhost:8080/sparql`;
 export const API_BASE = `${SERVER}/api/q2forge`;
 export const LOGIN_ENDPOINT = `${API_BASE}/token`;
